@@ -4,6 +4,7 @@ Automates login to https://cypresslakecc.clubhouseonline-e3.com/Member-Central
 """
 
 import os
+import glob
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -12,6 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 import time
+import glob
 
 # Load environment variables
 load_dotenv()
@@ -41,9 +43,27 @@ class ClubhouseBot:
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option('useAutomationExtension', False)
         
-        # Initialize driver
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=options)
+        # Initialize driver with proper chromedriver path
+        try:
+            # Try to get chromedriver path from webdriver-manager
+            chromedriver_path = ChromeDriverManager().install()
+            
+            # Fix for macOS ARM64: find the actual executable if path points to a text file
+            if not os.path.isfile(chromedriver_path) or chromedriver_path.endswith('.txt'):
+                # Search for the actual chromedriver executable in the parent directory
+                parent_dir = os.path.dirname(chromedriver_path)
+                possible_paths = glob.glob(os.path.join(parent_dir, '**/chromedriver'), recursive=True)
+                if possible_paths:
+                    chromedriver_path = possible_paths[0]
+                    print(f"Using chromedriver from: {chromedriver_path}")
+            
+            service = Service(chromedriver_path)
+            self.driver = webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            print(f"Error initializing ChromeDriver: {e}")
+            print("Trying with default Chrome...")
+            self.driver = webdriver.Chrome(options=options)
+        
         self.wait = WebDriverWait(self.driver, 10)
     
     def login(self):
@@ -63,20 +83,20 @@ class ClubhouseBot:
             # Find and fill username field
             print("Looking for login form...")
             username_field = self.wait.until(
-                EC.presence_of_element_located((By.NAME, "Username"))
+                EC.presence_of_element_located((By.ID, "p_lt_page_content_pageplaceholder_p_lt_zoneLeft_CHOLogin_LoginControl_ctl00_Login1_UserName"))
             )
             username_field.clear()
             username_field.send_keys(self.username)
             print("✓ Username entered")
             
             # Find and fill password field
-            password_field = self.driver.find_element(By.NAME, "Password")
+            password_field = self.driver.find_element(By.ID, "p_lt_page_content_pageplaceholder_p_lt_zoneLeft_CHOLogin_LoginControl_ctl00_Login1_Password")
             password_field.clear()
             password_field.send_keys(self.password)
             print("✓ Password entered")
             
             # Click login button
-            login_button = self.driver.find_element(By.XPATH, "//input[@type='submit']")
+            login_button = self.driver.find_element(By.ID, "p_lt_page_content_pageplaceholder_p_lt_zoneLeft_CHOLogin_LoginControl_ctl00_Login1_LoginButton")
             login_button.click()
             print("✓ Login button clicked")
             
