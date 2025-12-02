@@ -1,4 +1,4 @@
-# Marcos Tee Time Bot
+# Tee Time Bot
 
 A Python bot for automating login and interactions with Cypress Lake CC's Clubhouse Online portal.
 
