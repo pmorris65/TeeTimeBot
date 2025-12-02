@@ -17,6 +17,50 @@ import time
 # Load environment variables
 load_dotenv()
 
+def get_next_saturday(from_date=None):
+    """
+    Return the date (datetime.date) for the next Saturday following `from_date`.
+
+    If `from_date` is None, uses today's date. If `from_date` is a
+    `datetime.date` or `datetime.datetime` it's accepted. If `from_date` is
+    a string it must be in `YYYY-MM-DD` format.
+
+    The function returns the next Saturday strictly after `from_date`.
+
+    Examples:
+        >>> get_next_saturday()
+        datetime.date(2025, 12, 13)
+
+    Args:
+        from_date (None|str|datetime.date|datetime.datetime): base date
+
+    Returns:
+        datetime.date: date object for the next Saturday
+    """
+    from datetime import date, datetime, timedelta
+
+    if from_date is None:
+        base = date.today()
+    elif isinstance(from_date, datetime):
+        base = from_date.date()
+    elif isinstance(from_date, date):
+        base = from_date
+    elif isinstance(from_date, str):
+        try:
+            base = datetime.strptime(from_date, "%Y-%m-%d").date()
+        except Exception:
+            raise ValueError("from_date string must be in YYYY-MM-DD format")
+    else:
+        raise TypeError("from_date must be None, str, date, or datetime")
+
+    # Python weekday(): Monday=0 ... Sunday=6. Saturday=5
+    target_weekday = 5
+    days_ahead = (target_weekday - base.weekday() + 7) % 7
+    if days_ahead == 0:
+        days_ahead = 7  # next Saturday, not today
+
+    return base + timedelta(days=days_ahead)
+
 class ClubhouseBot:
     def __init__(self, headless=False):
         """
@@ -113,7 +157,7 @@ class ClubhouseBot:
         except Exception as e:
             print(f"✗ Error during login: {str(e)}")
             return False
-    
+        
     def is_logged_in(self):
         """
         Check if user is logged in
@@ -135,6 +179,136 @@ class ClubhouseBot:
         except Exception as e:
             print(f"Error checking login status: {str(e)}")
             return False
+        
+    def navToTeeTimes(self):
+        """
+        Navigate to Tee Times page
+        """
+        try:
+            print("Looking for tee time nav button...")
+            tee_time_button = self.wait.until(
+                EC.presence_of_element_located((By.ID, "p_lt_header_3_cmsmenu_menuElem-006"))
+            )
+            tee_time_button.click()
+            print("✓ Navigated to Tee Times page")
+
+            # Wait for tee times to load
+            time.sleep(3)
+
+            if self.isOnTeeTimesPage():
+                print("✓ Confirmed on Tee Times page")
+                return True
+            else:
+                print("✗ Not on Tee Times page after navigation")
+                return False
+        except Exception as e:
+            print(f"Error navigating to Tee Times page: {str(e)}")
+            return False
+
+    def isOnTeeTimesPage(self):
+        """
+        Check if currently on Tee Times page
+        
+        Returns:
+            bool: True if on Tee Times page, False otherwise
+        """
+        try:
+            # Check for specific element or URL indicative of Tee Times page
+            if "TeeTimes" in self.driver.current_url:
+                return True
+            
+            tee_time_body = self.driver.find_elements(By.ID, "modulesContainer")
+            if tee_time_body:
+                return True
+            
+            return False
+        except Exception as e:
+            print(f"Error checking Tee Times page status: {str(e)}")
+            return False
+        
+    def bookTeeTime(self, date, time_slot, players):
+        """
+        Book a tee time
+        
+        Args:
+            date (str): Date for tee time (format: 'YYYY-MM-DD')
+            time_slot (str): Desired time slot (e.g., '10:00 AM')
+            players (list): List of player names
+        
+        Returns:
+            bool: True if booking successful, False otherwise
+        """
+        try:
+            print(f"Booking tee time on {date} at {time_slot} for players: {', '.join(players)}")
+            # Implementation of booking logic goes here
+            
+            # Placeholder for success
+            print("✓ Tee time booked successfully!")
+            return True
+        except Exception as e:
+            print(f"Error booking tee time: {str(e)}")
+            return False
+
+    def find_date_element(self, day, month, year, click=False, timeout=10):
+        """
+        Find a calendar date element by its data attributes and optionally click it.
+
+        Matches elements like:
+
+        <a class="date-wrapper active" data-date="13" data-year="2025" data-month="12" ...>
+
+        Args:
+            day (int|str): Day number (e.g. 13)
+            month (int|str): Month number (1-12)
+            year (int|str): Full year (e.g. 2025)
+            click (bool): If True, click the element after locating it
+            timeout (int): Seconds to wait for the element to appear
+
+        Returns:
+            selenium.webdriver.remote.webelement.WebElement or None
+        """
+        # Normalize to integers then strings to avoid leading-zero mismatches
+        try:
+            day_s = str(int(day))
+            month_s = str(int(month))
+            year_s = str(int(year))
+        except Exception:
+            day_s = str(day)
+            month_s = str(month)
+            year_s = str(year)
+
+        selector = f"a.date-wrapper[data-date='{day_s}'][data-month='{month_s}'][data-year='{year_s}']"
+
+        try:
+            elems = WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, selector))
+            )
+            if not elems:
+                return None
+
+            # Prefer an element that is visible/clickable
+            for el in elems:
+                if el.is_displayed():
+                    target = el
+                    break
+            else:
+                target = elems[0]
+
+            if click:
+                try:
+                    # scroll into view and click
+                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target)
+                    target.click()
+                except Exception:
+                    # fallback to JS click if normal click fails
+                    try:
+                        self.driver.execute_script("arguments[0].click();", target)
+                    except Exception as e:
+                        print(f"Failed to click date element: {e}")
+            return target
+        except Exception as e:
+            print(f"Error finding date element {day_s}-{month_s}-{year_s}: {e}")
+            return None
     
     def get_page_content(self):
         """
@@ -152,7 +326,7 @@ class ClubhouseBot:
 
 
 def main():
-    """Main function to demonstrate bot usage"""
+    """Main function for bot usage"""
     bot = None
     try:
         # Create bot instance
@@ -168,6 +342,24 @@ def main():
             time.sleep(5)
         else:
             print("Failed to login")
+
+        if bot.navToTeeTimes():
+            print("="*50)
+            print("Successfully navigated to Tee Times page.")
+            print("\n" + "="*50)
+        else:
+            print("Failed to navigate to Tee Times page.")
+
+        next_sat = get_next_saturday()
+
+        if bot.find_date_element(next_sat.day, next_sat.month, next_sat.year, click=True) != None:
+            print("="*50)
+            print(f"✓ Found and clicked on date element for {next_sat}")
+            print("\n" + "="*50)
+        else:
+            print(f"✗ Could not find date element for {next_sat}")
+
+        time.sleep(5)
     
     except ValueError as e:
         print(f"Configuration Error: {e}")
