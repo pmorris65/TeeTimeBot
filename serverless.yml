@@ -1,5 +1,4 @@
 service: teetimebot
-frameworkVersion: '3'
 
 params:
   default:
