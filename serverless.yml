@@ -1,0 +1,40 @@
+service: teetimebot
+frameworkVersion: '3'
+
+params:
+  default:
+    clubhouseUsername: ${env:CLUBHOUSE_USERNAME}
+    clubhousePassword: ${env:CLUBHOUSE_PASSWORD}
+    clubhouseUrl: ${env:CLUBHOUSE_URL, "https://cypresslakecc.clubhouseonline-e3.com/Member-Central"}
+
+provider:
+  name: aws
+  region: ${aws:region, "us-east-1"}
+  lambdaHashingVersion: 20201221
+  ecr:
+    images:
+      teetimebot:
+        # path containing your Dockerfile (this repo root)
+        path: ./
+  environment:
+    CLUBHOUSE_USERNAME: ${param:clubhouseUsername}
+    CLUBHOUSE_PASSWORD: ${param:clubhousePassword}
+    CLUBHOUSE_URL: ${param:clubhouseUrl}
+
+functions:
+  clubhouseBot:
+    # Use the image defined under provider.ecr.images.teetimebot
+    image:
+      name: teetimebot
+    memorySize: 1024
+    timeout: 60
+    events:
+      - schedule:
+          # Runs every Saturday at 06:00 UTC
+          rate: cron(0 6 ? * SAT *)
+          enabled: true
+
+# Serverless will auto-create an IAM execution role with CloudWatch Logs permissions.
+# For additional AWS service access (e.g., Secrets Manager), add iamRoleStatements here.
+
+plugins: []

@@ -14,7 +14,7 @@ A Python bot for automating login and interactions with Cypress Lake CC's Clubho
 ### 1. Create Virtual Environment
 
 ```bash
-cd /Users/patrick/pythonProjects/MarcosTeeTimeBot
+cd /Users/patrick/pythonProjects/TeeTimeBot
 python3 -m venv venv
 ```
 
@@ -101,7 +101,7 @@ bot = ClubhouseBot(headless=True)
 ## Project Structure
 
 ```
-MarcosTeeTimeBot/
+TeeTimeBot/
 ├── README.md                 # This file
 ├── requirements.txt          # Python dependencies
 ├── .env.example             # Example environment variables

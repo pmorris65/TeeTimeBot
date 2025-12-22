@@ -1,0 +1,86 @@
+name: Build and Push Docker Image to ECR
+
+on: []
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: teetimebot
+  IMAGE_TAG: latest
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-ecr-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Ensure Lambda function exists
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+          LAMBDA_ROLE_ARN: ${{ secrets.LAMBDA_ROLE_ARN }}
+          CLUBHOUSE_USERNAME: ${{ secrets.CLUBHOUSE_USERNAME }}
+          CLUBHOUSE_PASSWORD: ${{ secrets.CLUBHOUSE_PASSWORD }}
+          CLUBHOUSE_URL: ${{ secrets.CLUBHOUSE_URL }}
+        run: |
+          set -e
+          echo "Checking for existing Lambda function 'teetimebot-scheduled'..."
+          if aws lambda get-function --function-name teetimebot-scheduled --region $AWS_REGION >/dev/null 2>&1; then
+            echo "Lambda function exists. Skipping creation."
+          else
+            echo "Lambda function not found — creating new function 'teetimebot-scheduled' using image $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+            aws lambda create-function \
+              --function-name teetimebot-scheduled \
+              --package-type Image \
+              --code ImageUri=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+              --role $LAMBDA_ROLE_ARN \
+              --timeout 60 \
+              --memory-size 1024 \
+              --region $AWS_REGION \
+              --environment "Variables={\"CLUBHOUSE_USERNAME\":\"$CLUBHOUSE_USERNAME\",\"CLUBHOUSE_PASSWORD\":\"$CLUBHOUSE_PASSWORD\",\"CLUBHOUSE_URL\":\"$CLUBHOUSE_URL\"}"
+          fi
+
+      - name: Update Lambda function
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          aws lambda update-function-code \
+            --function-name teetimebot-scheduled \
+            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for Lambda update
+        run: sleep 10
+
+      - name: Verify Lambda update
+        run: |
+          aws lambda get-function \
+            --function-name teetimebot-scheduled \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Configuration.LastUpdateStatus'
