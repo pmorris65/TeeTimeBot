@@ -42,37 +42,43 @@ aws iam put-role-policy \
   --role-name github-actions-ecr-role \
   --policy-name ecr-lambda-policy \
   --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Action": [
-          "ecr:GetAuthorizationToken",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:PutImage",
-          "ecr:InitiateLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload",
-          "ecr:CreateRepository"
-        ],
-        "Resource": "arn:aws:ecr:*:688290476312:repository/teetimebot"
-      },
-      {
-        "Effect": "Allow",
-        "Action": "ecr:GetAuthorizationToken",
-        "Resource": "*"
-      },
-      {
-        "Effect": "Allow",
-        "Action": [
-          "lambda:UpdateFunctionCode",
-          "lambda:GetFunction"
-        ],
-        "Resource": "arn:aws:lambda:*:688290476312:function:teetimebot-scheduled"
-      }
-    ]
-  }'
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": [
+				"ecr:GetAuthorizationToken",
+				"ecr:BatchCheckLayerAvailability",
+				"ecr:GetDownloadUrlForLayer",
+				"ecr:PutImage",
+				"ecr:InitiateLayerUpload",
+				"ecr:UploadLayerPart",
+				"ecr:CompleteLayerUpload",
+				"ecr:CreateRepository"
+			],
+			"Resource": "arn:aws:ecr:*:688290476312:repository/teetimebot"
+		},
+		{
+			"Effect": "Allow",
+			"Action": "ecr:GetAuthorizationToken",
+			"Resource": "*"
+		},
+		{
+			"Effect": "Allow",
+			"Action": [
+				"lambda:CreateFunction",
+				"lambda:UpdateFunctionCode",
+				"lambda:GetFunction"
+			],
+			"Resource": "arn:aws:lambda:*:688290476312:function:teetimebot-scheduled"
+		},
+		{
+			"Effect": "Allow",
+			"Action": "iam:PassRole",
+			"Resource": "*"
+		}
+	]
+}'
 ```
 
 ### 3. Add Repository Secret
