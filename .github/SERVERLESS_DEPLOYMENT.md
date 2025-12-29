@@ -99,7 +99,13 @@ cat > /tmp/permissions-policy.json <<EOF
       "Action": [
         "iam:PassRole",
         "iam:CreateRole",
-        "iam:PutRolePolicy"
+        "iam:PutRolePolicy",
+        "iam:GetRole",
+        "iam:DeleteRole",
+        "iam:DeleteRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:TagRole"
       ],
       "Resource": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/teetimebot-*"
     },
@@ -121,16 +127,54 @@ cat > /tmp/permissions-policy.json <<EOF
         "cloudformation:UpdateStack",
         "cloudformation:DeleteStack",
         "cloudformation:DescribeStacks",
+        "cloudformation:CreateChangeSet",
+        "cloudformation:DeleteChangeSet",
+        "cloudformation:DescribeChangeSet",
+        "cloudformation:ExecuteChangeSet",
+        "cloudformation:DescribeStackEvents",
         "cloudformation:DescribeStackResource",
         "cloudformation:DescribeStackResources",
         "cloudformation:ValidateTemplate"
       ],
-      "Resource": "arn:aws:cloudformation:*:${AWS_ACCOUNT_ID}:stack/teetimebot-*"
+      "Resource": "*"
     },
     {
       "Effect": "Allow",
       "Action": "sts:GetCallerIdentity",
       "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:ListBucket",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:GetBucketVersioning",
+        "s3:PutBucketVersioning",
+        "s3:GetBucketLocation",
+        "s3:ListBucketVersions",
+        "s3:PutBucketTagging",
+        "s3:PutBucketPolicy",
+        "s3:PutEncryptionConfiguration"
+      ],
+      "Resource": [
+        "arn:aws:s3:::teetimebot-*",
+        "arn:aws:s3:::teetimebot-*/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogGroups",
+        "logs:DescribeLogStreams",
+        "logs:TagResource"
+      ],
+      "Resource": "arn:aws:logs:*:*:*"
     }
   ]
 }
