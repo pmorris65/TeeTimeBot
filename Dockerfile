@@ -3,8 +3,7 @@ FROM public.ecr.aws/lambda/python:3.11
 # Install system dependencies for Chrome/Chromium
 RUN yum update -y && \
     yum install -y \
-    chromium-browser \
-    chromium-headless-shell \
+    chromium \
     && yum clean all
 
 # Copy requirements
