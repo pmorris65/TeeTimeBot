@@ -20,6 +20,13 @@ provider:
     CLUBHOUSE_USERNAME: ${param:clubhouseUsername}
     CLUBHOUSE_PASSWORD: ${param:clubhousePassword}
     CLUBHOUSE_URL: ${param:clubhouseUrl}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - ecr:GetAuthorizationToken
+        - ecr:BatchGetImage
+        - ecr:GetDownloadUrlForLayer
+      Resource: "*"
 
 functions:
   clubhouseBot:
