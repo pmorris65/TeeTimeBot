@@ -9,8 +9,12 @@ params:
 
 provider:
   name: aws
-  region: us-east-1
+  region: ${aws:region, "us-east-1"}
   lambdaHashingVersion: 20201221
+  logs:
+    restApi: false
+    websocket: false
+    httpApi: false
   ecr:
     images:
       teetimebot:
@@ -20,8 +24,6 @@ provider:
     CLUBHOUSE_USERNAME: ${param:clubhouseUsername}
     CLUBHOUSE_PASSWORD: ${param:clubhousePassword}
     CLUBHOUSE_URL: ${param:clubhouseUrl}
-  logs:
-    restApi: false
 
 functions:
   clubhouseBot:
@@ -30,7 +32,7 @@ functions:
       name: teetimebot
     memorySize: 1024
     timeout: 60
-    logRetentionInDays: 7  # optional: auto-delete old logs
+    logRetentionInDays: 7  # Auto-delete logs after 7 days
     events:
       - schedule:
           # Runs every Saturday at 06:00 UTC

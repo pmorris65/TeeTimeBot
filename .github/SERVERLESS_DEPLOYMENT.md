@@ -168,6 +168,7 @@ cat > /tmp/permissions-policy.json <<EOF
       "Effect": "Allow",
       "Action": [
         "logs:CreateLogGroup",
+        "logs:DeleteLogGroup",
         "logs:CreateLogStream",
         "logs:PutLogEvents",
         "logs:DescribeLogGroups",
