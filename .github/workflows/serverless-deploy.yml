@@ -1,9 +1,5 @@
 name: Deploy with Serverless Framework
 
-on:
-  push:
-    branches:
-      - main
 
 env:
   AWS_REGION: us-east-1
