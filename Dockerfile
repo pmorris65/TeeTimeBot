@@ -1,9 +1,4 @@
-FROM amazon/aws-lambda-python:3.8
-
-# Install system dependencies for Chrome/Chromium
-RUN yum install -y \
-    chromium \
-    && yum clean all
+FROM public.ecr.aws/lambda/python:3.11
 
 # Copy requirements
 COPY requirements.txt ${LAMBDA_TASK_ROOT}/
