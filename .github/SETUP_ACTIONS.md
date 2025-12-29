@@ -53,7 +53,8 @@ aws iam put-role-policy \
           "ecr:PutImage",
           "ecr:InitiateLayerUpload",
           "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload"
+          "ecr:CompleteLayerUpload",
+          "ecr:CreateRepository"
         ],
         "Resource": "arn:aws:ecr:*:688290476312:repository/teetimebot"
       },
