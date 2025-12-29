@@ -1,8 +1,7 @@
-FROM public.ecr.aws/lambda/python:3.11
+FROM amazon/aws-lambda-python:3.8
 
 # Install system dependencies for Chrome/Chromium
-RUN yum update -y && \
-    yum install -y \
+RUN yum install -y \
     chromium \
     && yum clean all
 
