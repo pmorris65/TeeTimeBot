@@ -65,7 +65,7 @@ jobs:
               --timeout 60 \
               --memory-size 1024 \
               --region $AWS_REGION \
-              --environment Variables=CLUBHOUSE_USERNAME=$CLUBHOUSE_USERNAME,CLUBHOUSE_PASSWORD=$CLUBHOUSE_PASSWORD,CLUBHOUSE_URL=$CLUBHOUSE_URL
+              --environment 'Variables={CLUBHOUSE_USERNAME='$CLUBHOUSE_USERNAME',CLUBHOUSE_PASSWORD='$CLUBHOUSE_PASSWORD',CLUBHOUSE_URL='$CLUBHOUSE_URL'}'
           fi
 
       - name: Update Lambda function
