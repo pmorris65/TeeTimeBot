@@ -90,7 +90,8 @@ cat > /tmp/permissions-policy.json <<EOF
         "lambda:UpdateFunctionConfiguration",
         "lambda:GetFunction",
         "lambda:AddPermission",
-        "lambda:RemovePermission"
+        "lambda:RemovePermission",
+        "lambda:TagResource"
       ],
       "Resource": "arn:aws:lambda:*:${AWS_ACCOUNT_ID}:function:teetimebot-*"
     },

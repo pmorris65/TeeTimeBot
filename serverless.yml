@@ -20,13 +20,11 @@ provider:
     CLUBHOUSE_USERNAME: ${param:clubhouseUsername}
     CLUBHOUSE_PASSWORD: ${param:clubhousePassword}
     CLUBHOUSE_URL: ${param:clubhouseUrl}
-  iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action:
-            - ecr:*
-          Resource: "*"
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - ecr:*
+      Resource: "*"
 
 functions:
   clubhouseBot:
