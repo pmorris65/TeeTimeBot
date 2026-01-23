@@ -4,14 +4,8 @@ Automates login to https://cypresslakecc.clubhouseonline-e3.com/Member-Central
 """
 
 import os
-import glob
 from dotenv import load_dotenv
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+from playwright.sync_api import sync_playwright
 import time
 
 # Load environment variables
@@ -65,87 +59,65 @@ class ClubhouseBot:
     def __init__(self, headless=False):
         """
         Initialize the Clubhouse bot
-        
+
         Args:
             headless (bool): Run browser in headless mode (no GUI)
         """
         self.username = os.getenv('CLUBHOUSE_USERNAME')
         self.password = os.getenv('CLUBHOUSE_PASSWORD')
         self.base_url = os.getenv('CLUBHOUSE_URL', 'https://cypresslakecc.clubhouseonline-e3.com/Member-Central')
-        
+
         if not self.username or not self.password:
             raise ValueError("CLUBHOUSE_USERNAME and CLUBHOUSE_PASSWORD must be set in .env file")
-        
-        # Setup Chrome options
-        options = webdriver.ChromeOptions()
-        if headless:
-            options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
-        
-        # Initialize driver with proper chromedriver path
-        try:
-            # Try to get chromedriver path from webdriver-manager
-            chromedriver_path = ChromeDriverManager().install()
-            
-            # Fix for macOS ARM64: find the actual executable if path points to a text file
-            if not os.path.isfile(chromedriver_path) or chromedriver_path.endswith('.txt'):
-                # Search for the actual chromedriver executable in the parent directory
-                parent_dir = os.path.dirname(chromedriver_path)
-                possible_paths = glob.glob(os.path.join(parent_dir, '**/chromedriver'), recursive=True)
-                if possible_paths:
-                    chromedriver_path = possible_paths[0]
-                    print(f"Using chromedriver from: {chromedriver_path}")
-            
-            service = Service(chromedriver_path)
-            self.driver = webdriver.Chrome(service=service, options=options)
-        except Exception as e:
-            print(f"Error initializing ChromeDriver: {e}")
-            print("Trying with default Chrome...")
-            self.driver = webdriver.Chrome(options=options)
-        
-        self.wait = WebDriverWait(self.driver, 10)
-    
+
+        # Initialize Playwright
+        self.playwright = sync_playwright().start()
+        self.browser = self.playwright.chromium.launch(
+            headless=headless,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled"
+            ]
+        )
+        self.page = self.browser.new_page()
+
     def login(self):
         """
         Login to Clubhouse Online
-        
+
         Returns:
             bool: True if login successful, False otherwise
         """
         try:
             print(f"Navigating to {self.base_url}...")
-            self.driver.get(self.base_url)
-            
+            self.page.goto(self.base_url)
+
             # Wait for page to load
             time.sleep(2)
-            
+
             # Find and fill username field
             print("Looking for login form...")
-            username_field = self.wait.until(
-                EC.presence_of_element_located((By.ID, "p_lt_page_content_pageplaceholder_p_lt_zoneLeft_CHOLogin_LoginControl_ctl00_Login1_UserName"))
-            )
-            username_field.clear()
-            username_field.send_keys(self.username)
+            username_selector = "#p_lt_page_content_pageplaceholder_p_lt_zoneLeft_CHOLogin_LoginControl_ctl00_Login1_UserName"
+            self.page.locator(username_selector).wait_for(timeout=10000)
+            self.page.locator(username_selector).clear()
+            self.page.locator(username_selector).fill(self.username)
             print("✓ Username entered")
-            
+
             # Find and fill password field
-            password_field = self.driver.find_element(By.ID, "p_lt_page_content_pageplaceholder_p_lt_zoneLeft_CHOLogin_LoginControl_ctl00_Login1_Password")
-            password_field.clear()
-            password_field.send_keys(self.password)
+            password_selector = "#p_lt_page_content_pageplaceholder_p_lt_zoneLeft_CHOLogin_LoginControl_ctl00_Login1_Password"
+            self.page.locator(password_selector).clear()
+            self.page.locator(password_selector).fill(self.password)
             print("✓ Password entered")
-            
+
             # Click login button
-            login_button = self.driver.find_element(By.ID, "p_lt_page_content_pageplaceholder_p_lt_zoneLeft_CHOLogin_LoginControl_ctl00_Login1_LoginButton")
-            login_button.click()
+            login_button_selector = "#p_lt_page_content_pageplaceholder_p_lt_zoneLeft_CHOLogin_LoginControl_ctl00_Login1_LoginButton"
+            self.page.locator(login_button_selector).click()
             print("✓ Login button clicked")
-            
+
             # Wait for successful login
             time.sleep(3)
-            
+
             # Check if login was successful
             if self.is_logged_in():
                 print("✓ Login successful!")
@@ -153,43 +125,42 @@ class ClubhouseBot:
             else:
                 print("✗ Login failed - check credentials")
                 return False
-                
+
         except Exception as e:
             print(f"✗ Error during login: {str(e)}")
             return False
-        
+
     def is_logged_in(self):
         """
         Check if user is logged in
-        
+
         Returns:
             bool: True if logged in, False otherwise
         """
         try:
             # Check if logout link/button exists (typical indicator of logged-in state)
-            logout_elements = self.driver.find_elements(By.LINK_TEXT, "Logout")
-            if logout_elements:
+            logout_elements = self.page.get_by_text("Logout")
+            if logout_elements.count() > 0:
                 return True
-            
+
             # Alternative: check page URL or other elements
-            if "Member-Central" in self.driver.current_url:
+            if "Member-Central" in self.page.url:
                 return True
-            
+
             return False
         except Exception as e:
             print(f"Error checking login status: {str(e)}")
             return False
-        
+
     def navToTeeTimes(self):
         """
         Navigate to Tee Times page
         """
         try:
             print("Looking for tee time nav button...")
-            tee_time_button = self.wait.until(
-                EC.presence_of_element_located((By.ID, "p_lt_header_3_cmsmenu_menuElem-006"))
-            )
-            tee_time_button.click()
+            tee_time_selector = "#p_lt_header_3_cmsmenu_menuElem-006"
+            self.page.locator(tee_time_selector).wait_for(timeout=10000)
+            self.page.locator(tee_time_selector).click()
             print("✓ Navigated to Tee Times page")
 
             # Wait for tee times to load
@@ -208,40 +179,40 @@ class ClubhouseBot:
     def isOnTeeTimesPage(self):
         """
         Check if currently on Tee Times page
-        
+
         Returns:
             bool: True if on Tee Times page, False otherwise
         """
         try:
             # Check for specific element or URL indicative of Tee Times page
-            if "TeeTimes" in self.driver.current_url:
+            if "TeeTimes" in self.page.url:
                 return True
-            
-            tee_time_body = self.driver.find_elements(By.ID, "modulesContainer")
-            if tee_time_body:
+
+            tee_time_body = self.page.locator("#modulesContainer")
+            if tee_time_body.count() > 0:
                 return True
-            
+
             return False
         except Exception as e:
             print(f"Error checking Tee Times page status: {str(e)}")
             return False
-        
+
     def bookTeeTime(self, date, time_slot, players):
         """
         Book a tee time
-        
+
         Args:
             date (str): Date for tee time (format: 'YYYY-MM-DD')
             time_slot (str): Desired time slot (e.g., '10:00 AM')
             players (list): List of player names
-        
+
         Returns:
             bool: True if booking successful, False otherwise
         """
         try:
             print(f"Booking tee time on {date} at {time_slot} for players: {', '.join(players)}")
             # Implementation of booking logic goes here
-            
+
             # Placeholder for success
             print("✓ Tee time booked successfully!")
             return True
@@ -265,7 +236,7 @@ class ClubhouseBot:
             timeout (int): Seconds to wait for the element to appear
 
         Returns:
-            selenium.webdriver.remote.webelement.WebElement or None
+            Playwright Locator or None
         """
         # Normalize to integers then strings to avoid leading-zero mismatches
         try:
@@ -280,48 +251,44 @@ class ClubhouseBot:
         selector = f"a.date-wrapper[data-date='{day_s}'][data-month='{month_s}'][data-year='{year_s}']"
 
         try:
-            elems = WebDriverWait(self.driver, timeout).until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, selector))
-            )
-            if not elems:
+            locator = self.page.locator(selector)
+            locator.first.wait_for(timeout=timeout * 1000)
+
+            if locator.count() == 0:
                 return None
 
-            # Prefer an element that is visible/clickable
-            for el in elems:
-                if el.is_displayed():
-                    target = el
-                    break
-            else:
-                target = elems[0]
+            # Get the first visible element
+            target = locator.first
 
             if click:
                 try:
-                    # scroll into view and click
-                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target)
+                    # Scroll into view and click
+                    target.scroll_into_view_if_needed()
                     target.click()
                 except Exception:
-                    # fallback to JS click if normal click fails
+                    # Fallback to JS click if normal click fails
                     try:
-                        self.driver.execute_script("arguments[0].click();", target)
+                        target.evaluate("el => el.click()")
                     except Exception as e:
                         print(f"Failed to click date element: {e}")
             return target
         except Exception as e:
             print(f"Error finding date element {day_s}-{month_s}-{year_s}: {e}")
             return None
-    
+
     def get_page_content(self):
         """
         Get current page content
-        
+
         Returns:
             str: Page HTML content
         """
-        return self.driver.page_source
-    
+        return self.page.content()
+
     def close(self):
         """Close the browser"""
-        self.driver.quit()
+        self.browser.close()
+        self.playwright.stop()
         print("Browser closed")
 
 
@@ -331,13 +298,13 @@ def main():
     try:
         # Create bot instance
         bot = ClubhouseBot(headless=False)
-        
+
         # Perform login
         if bot.login():
             print("\n" + "="*50)
             print("Bot is logged in and ready for further actions")
             print("="*50)
-            
+
             # Keep browser open for 5 seconds to see the result
             time.sleep(5)
         else:
@@ -360,16 +327,16 @@ def main():
             print(f"✗ Could not find date element for {next_sat}")
 
         time.sleep(5)
-    
+
     except ValueError as e:
         print(f"Configuration Error: {e}")
         print("\nPlease set up your .env file with:")
         print("  CLUBHOUSE_USERNAME=your_username")
         print("  CLUBHOUSE_PASSWORD=your_password")
-    
+
     except Exception as e:
         print(f"Unexpected error: {e}")
-    
+
     finally:
         if bot:
             bot.close()
