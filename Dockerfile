@@ -4,7 +4,10 @@ FROM public.ecr.aws/lambda/python:3.11
 RUN yum install -y \
     alsa-lib \
     atk \
+    at-spi2-atk \
+    at-spi2-core \
     cups-libs \
+    dbus-libs \
     gtk3 \
     libXcomposite \
     libXcursor \
@@ -14,6 +17,7 @@ RUN yum install -y \
     libXrandr \
     libXScrnSaver \
     libXtst \
+    libxkbcommon \
     pango \
     xorg-x11-fonts-100dpi \
     xorg-x11-fonts-75dpi \
@@ -22,9 +26,14 @@ RUN yum install -y \
     xorg-x11-fonts-Type1 \
     xorg-x11-utils \
     nss \
+    nspr \
     libdrm \
     mesa-libgbm \
+    libgbm \
     && yum clean all
+
+# Set Playwright browser path
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 # Copy requirements
 COPY requirements.txt ${LAMBDA_TASK_ROOT}/
@@ -32,8 +41,8 @@ COPY requirements.txt ${LAMBDA_TASK_ROOT}/
 # Install Python dependencies
 RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
 
-# Install Playwright browsers (Chromium only for smaller image)
-RUN playwright install chromium
+# Install Playwright Chromium browser
+RUN mkdir -p /opt/playwright && playwright install chromium
 
 # Copy function code and bot module
 COPY clubhouse_bot.py ${LAMBDA_TASK_ROOT}/
