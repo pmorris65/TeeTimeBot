@@ -1,0 +1,211 @@
+import * as cdk from 'aws-cdk-lib';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import { Construct } from 'constructs';
+
+interface TeetimebotStackProps extends cdk.StackProps {
+  githubOrg: string;
+  githubRepo: string;
+}
+
+export class TeetimebotStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props: TeetimebotStackProps) {
+    super(scope, id, props);
+
+    const { githubOrg, githubRepo } = props;
+
+    // GitHub OIDC Provider (import existing or create)
+    const githubOidcProvider = iam.OpenIdConnectProvider.fromOpenIdConnectProviderArn(
+      this,
+      'GitHubOidcProvider',
+      `arn:aws:iam::${this.account}:oidc-provider/token.actions.githubusercontent.com`
+    );
+
+    // GitHub Actions IAM Role
+    const githubActionsRole = new iam.Role(this, 'GitHubActionsRole', {
+      roleName: 'github-actions-teetimebot-role',
+      assumedBy: new iam.WebIdentityPrincipal(
+        githubOidcProvider.openIdConnectProviderArn,
+        {
+          StringEquals: {
+            'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
+          },
+          StringLike: {
+            'token.actions.githubusercontent.com:sub': `repo:${githubOrg}/${githubRepo}:*`,
+          },
+        }
+      ),
+    });
+
+    // ECR permissions
+    githubActionsRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'ECRAuth',
+      actions: ['ecr:GetAuthorizationToken'],
+      resources: ['*'],
+    }));
+
+    githubActionsRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'ECRPush',
+      actions: [
+        'ecr:BatchCheckLayerAvailability',
+        'ecr:GetDownloadUrlForLayer',
+        'ecr:BatchGetImage',
+        'ecr:PutImage',
+        'ecr:InitiateLayerUpload',
+        'ecr:UploadLayerPart',
+        'ecr:CompleteLayerUpload',
+        'ecr:DescribeRepositories',
+        'ecr:DescribeImages',
+      ],
+      resources: [`arn:aws:ecr:${this.region}:${this.account}:repository/teetimebot`],
+    }));
+
+    // CloudFormation permissions for CDK
+    githubActionsRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'CloudFormation',
+      actions: [
+        'cloudformation:CreateStack',
+        'cloudformation:UpdateStack',
+        'cloudformation:DeleteStack',
+        'cloudformation:DescribeStacks',
+        'cloudformation:DescribeStackEvents',
+        'cloudformation:DescribeStackResources',
+        'cloudformation:GetTemplate',
+        'cloudformation:ValidateTemplate',
+        'cloudformation:CreateChangeSet',
+        'cloudformation:DescribeChangeSet',
+        'cloudformation:ExecuteChangeSet',
+        'cloudformation:DeleteChangeSet',
+        'cloudformation:GetTemplateSummary',
+      ],
+      resources: [`arn:aws:cloudformation:${this.region}:${this.account}:stack/TeetimebotStack/*`],
+    }));
+
+    // Lambda permissions
+    githubActionsRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'Lambda',
+      actions: [
+        'lambda:CreateFunction',
+        'lambda:UpdateFunctionCode',
+        'lambda:UpdateFunctionConfiguration',
+        'lambda:DeleteFunction',
+        'lambda:GetFunction',
+        'lambda:GetFunctionConfiguration',
+        'lambda:AddPermission',
+        'lambda:RemovePermission',
+        'lambda:GetPolicy',
+        'lambda:TagResource',
+        'lambda:UntagResource',
+        'lambda:ListTags',
+      ],
+      resources: [`arn:aws:lambda:${this.region}:${this.account}:function:teetimebot-*`],
+    }));
+
+    // EventBridge permissions
+    githubActionsRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'EventBridge',
+      actions: [
+        'events:PutRule',
+        'events:DeleteRule',
+        'events:DescribeRule',
+        'events:EnableRule',
+        'events:DisableRule',
+        'events:PutTargets',
+        'events:RemoveTargets',
+        'events:ListTargetsByRule',
+        'events:TagResource',
+        'events:UntagResource',
+      ],
+      resources: [`arn:aws:events:${this.region}:${this.account}:rule/teetimebot-*`],
+    }));
+
+    // IAM permissions for Lambda execution role
+    githubActionsRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'IAMRoles',
+      actions: [
+        'iam:CreateRole',
+        'iam:DeleteRole',
+        'iam:GetRole',
+        'iam:UpdateRole',
+        'iam:PassRole',
+        'iam:AttachRolePolicy',
+        'iam:DetachRolePolicy',
+        'iam:PutRolePolicy',
+        'iam:DeleteRolePolicy',
+        'iam:GetRolePolicy',
+        'iam:ListRolePolicies',
+        'iam:ListAttachedRolePolicies',
+        'iam:TagRole',
+        'iam:UntagRole',
+      ],
+      resources: [
+        `arn:aws:iam::${this.account}:role/TeetimebotStack-*`,
+        `arn:aws:iam::${this.account}:role/cdk-*`,
+      ],
+    }));
+
+    // SSM for CDK bootstrap
+    githubActionsRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'SSM',
+      actions: ['ssm:GetParameter', 'ssm:GetParameters'],
+      resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/cdk-bootstrap/*`],
+    }));
+
+    // S3 for CDK staging
+    githubActionsRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'S3CDKStaging',
+      actions: [
+        's3:GetObject',
+        's3:PutObject',
+        's3:DeleteObject',
+        's3:ListBucket',
+        's3:GetBucketLocation',
+      ],
+      resources: [
+        `arn:aws:s3:::cdk-*-assets-${this.account}-${this.region}`,
+        `arn:aws:s3:::cdk-*-assets-${this.account}-${this.region}/*`,
+      ],
+    }));
+
+    // Import existing ECR repository
+    const repository = ecr.Repository.fromRepositoryName(
+      this,
+      'TeetimebotRepo',
+      'teetimebot'
+    );
+
+    // Lambda function from container image
+    const fn = new lambda.DockerImageFunction(this, 'TeetimebotFunction', {
+      functionName: 'teetimebot-scheduled',
+      code: lambda.DockerImageCode.fromEcr(repository, { tagOrDigest: 'latest' }),
+      memorySize: 1024,
+      timeout: cdk.Duration.seconds(60),
+      environment: {
+        CLUBHOUSE_USERNAME: process.env.CLUBHOUSE_USERNAME || '',
+        CLUBHOUSE_PASSWORD: process.env.CLUBHOUSE_PASSWORD || '',
+        CLUBHOUSE_URL: process.env.CLUBHOUSE_URL || 'https://cypresslakecc.clubhouseonline-e3.com/Member-Central',
+      },
+    });
+
+    // EventBridge schedule - every Saturday at 6 AM UTC
+    new events.Rule(this, 'WeeklySchedule', {
+      ruleName: 'teetimebot-weekly-schedule',
+      schedule: events.Schedule.cron({ minute: '0', hour: '6', weekDay: 'SAT' }),
+      targets: [new targets.LambdaFunction(fn)],
+    });
+
+    // Outputs
+    new cdk.CfnOutput(this, 'LambdaFunctionArn', {
+      value: fn.functionArn,
+      description: 'TeeTimeBot Lambda Function ARN',
+    });
+
+    new cdk.CfnOutput(this, 'GitHubActionsRoleArn', {
+      value: githubActionsRole.roleArn,
+      description: 'GitHub Actions IAM Role ARN',
+    });
+  }
+}

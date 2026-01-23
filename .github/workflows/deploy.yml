@@ -1,4 +1,8 @@
-name: Build and Push Docker Image to ECR
+name: Build and Deploy with CDK
+
+# BOOTSTRAP NOTE: The first deployment requires the existing 'github-actions-ecr-role'
+# to have CDK deployment permissions. After the first successful deploy, you can switch
+# to the CDK-managed role 'github-actions-teetimebot-role' which has all required permissions.
 
 on:
   push:
@@ -11,9 +15,9 @@ env:
   IMAGE_TAG: latest
 
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    
+
     permissions:
       id-token: write
       contents: read
@@ -42,48 +46,33 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Ensure Lambda function exists
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Install CDK dependencies
+        working-directory: infra
+        run: npm ci
+
+      - name: Deploy with CDK
+        working-directory: infra
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-          LAMBDA_ROLE_ARN: ${{ secrets.LAMBDA_ROLE_ARN }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           CLUBHOUSE_USERNAME: ${{ secrets.CLUBHOUSE_USERNAME }}
           CLUBHOUSE_PASSWORD: ${{ secrets.CLUBHOUSE_PASSWORD }}
           CLUBHOUSE_URL: ${{ secrets.CLUBHOUSE_URL }}
         run: |
-          set -e
-          echo "Checking for existing Lambda function 'teetimebot-scheduled'..."
-          if aws lambda get-function --function-name teetimebot-scheduled --region $AWS_REGION >/dev/null 2>&1; then
-            echo "Lambda function exists. Skipping creation."
-          else
-            echo "Lambda function not found — creating new function 'teetimebot-scheduled' using image $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-            aws lambda create-function \
-              --function-name teetimebot-scheduled \
-              --package-type Image \
-              --code ImageUri=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-              --role $LAMBDA_ROLE_ARN \
-              --timeout 60 \
-              --memory-size 1024 \
-              --region $AWS_REGION \
-              --environment 'Variables={CLUBHOUSE_USERNAME='$CLUBHOUSE_USERNAME',CLUBHOUSE_PASSWORD='$CLUBHOUSE_PASSWORD',CLUBHOUSE_URL='$CLUBHOUSE_URL'}'
-          fi
+          cdk deploy --require-approval never \
+            -c githubOrg=${{ github.repository_owner }} \
+            -c githubRepo=${{ github.event.repository.name }}
 
-      - name: Update Lambda function
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          aws lambda update-function-code \
-            --function-name teetimebot-scheduled \
-            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            --region ${{ env.AWS_REGION }}
-
-      - name: Wait for Lambda update
-        run: sleep 10
-
-      - name: Verify Lambda update
+      - name: Verify Lambda deployment
         run: |
           aws lambda get-function \
             --function-name teetimebot-scheduled \
             --region ${{ env.AWS_REGION }} \
-            --query 'Configuration.LastUpdateStatus'
+            --query 'Configuration.{FunctionName:FunctionName,LastModified:LastModified,State:State}'
