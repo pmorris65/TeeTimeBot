@@ -277,6 +277,110 @@ class ClubhouseBot:
             print(f"Error finding date element {day_s}-{month_s}-{year_s}: {e}")
             return None
 
+    def select_tee_time(self, time_slot, hole, timeout=10):
+        """
+        Find and click on a specific tee time slot.
+
+        Args:
+            time_slot (str): Time slot to find (e.g., '8:07', '8:07 AM')
+            hole (int|str): Hole number (e.g., 10 for 'Hole 10')
+            timeout (int): Seconds to wait for elements to load
+
+        Returns:
+            bool: True if tee time was found and clicked, False otherwise
+        """
+        print(f"Looking for tee time: {time_slot} on Hole {hole}...")
+
+        # Wait for tee times to load
+        time.sleep(2)
+
+        try:
+            # Normalize time to HH:MM:SS format for data-timeof attribute
+            time_normalized = time_slot.replace(' AM', '').replace(' PM', '').replace(' am', '').replace(' pm', '').strip()
+            # Convert "8:07" to "08:07:00"
+            parts = time_normalized.split(':')
+            if len(parts) == 2:
+                hour = parts[0].zfill(2)
+                minute = parts[1].zfill(2)
+                time_data = f"{hour}:{minute}:00"
+            else:
+                time_data = time_normalized
+
+            # Build selector using data attributes
+            # Structure: <div class="tt card" data-timeof="08:07:00" data-hole="10" data-slotsavailable="X">
+            selector = f"div.tt.card[data-timeof='{time_data}'][data-hole='{hole}']"
+
+            locator = self.page.locator(selector)
+
+            if locator.count() == 0:
+                print(f"✗ Could not find tee time element: {time_slot} on Hole {hole}")
+                self._log_available_tee_times()
+                return False
+
+            element = locator.first
+
+            # Check availability via data-slotsavailable attribute
+            slots_available = element.get_attribute('data-slotsavailable')
+            class_attr = element.get_attribute('class') or ''
+
+            if slots_available == '0' or 'unavailable' in class_attr:
+                print(f"✗ Tee time {time_slot} Hole {hole} is NOT AVAILABLE (slots: {slots_available})")
+
+                # Try to get who booked it
+                try:
+                    player_names = element.locator('.player-name-text').all_inner_texts()
+                    if player_names:
+                        print(f"  Currently booked by: {', '.join(player_names)}")
+                except Exception:
+                    pass
+
+                return False
+
+            # Tee time is available - click it
+            print(f"✓ Tee time {time_slot} Hole {hole} is AVAILABLE (slots: {slots_available})")
+            element.scroll_into_view_if_needed()
+            element.click()
+            print(f"✓ Clicked on tee time: {time_slot} on Hole {hole}")
+            return True
+
+        except Exception as e:
+            print(f"✗ Error selecting tee time: {str(e)}")
+            self._log_available_tee_times()
+            return False
+
+    def _log_available_tee_times(self):
+        """Debug helper to log visible tee time elements on the page."""
+        try:
+            print("\n  Debug: Attempting to find any tee time elements...")
+
+            # Look for elements containing time patterns (e.g., "8:07", "10:30")
+            # Search the entire page text for time patterns
+            page_text = self.page.inner_text("body")
+            import re
+            time_pattern = re.findall(r'\d{1,2}:\d{2}(?:\s*[AP]M)?', page_text)
+            if time_pattern:
+                unique_times = list(dict.fromkeys(time_pattern))[:20]  # First 20 unique times
+                print(f"  Found times on page: {', '.join(unique_times)}")
+
+            # Look for elements with "8:07" specifically
+            elements_with_time = self.page.locator("//*[contains(text(), '8:07')]")
+            if elements_with_time.count() > 0:
+                print(f"  Found {elements_with_time.count()} elements containing '8:07'")
+                for i in range(min(elements_with_time.count(), 5)):
+                    el = elements_with_time.nth(i)
+                    tag = el.evaluate("el => el.tagName")
+                    classes = el.get_attribute('class') or 'no-class'
+                    print(f"    - <{tag}> class='{classes}'")
+
+            # Save page HTML for debugging
+            html_content = self.page.content()
+            with open('/tmp/tee_times_page.html', 'w') as f:
+                f.write(html_content)
+            print("  Page HTML saved to /tmp/tee_times_page.html for inspection")
+
+        except Exception as e:
+            print(f"  Debug error: {e}")
+
     def get_page_content(self):
         """
         Get current page content
@@ -330,7 +434,20 @@ def main():
         if bot.find_date_element(next_sat.day, next_sat.month, next_sat.year, click=True) != None:
             print("="*50)
             print(f"✓ Found and clicked on date element for {next_sat}")
-            print("\n" + "="*50)
+            print("="*50)
+
+            # Wait for tee times to load after date selection
+            time.sleep(3)
+
+            # Try to select the 8:07 AM Hole 10 tee time
+            if bot.select_tee_time("8:07", 10):
+                print("="*50)
+                print("✓ Successfully selected tee time!")
+                print("="*50)
+            else:
+                print("="*50)
+                print("✗ Could not select the 8:07 Hole 10 tee time")
+                print("="*50)
         else:
             print(f"✗ Could not find date element for {next_sat}")
 
