@@ -3,6 +3,7 @@ Clubhouse Online Bot for Cypress Lake CC
 Automates login to https://cypresslakecc.clubhouseonline-e3.com/Member-Central
 """
 
+import argparse
 import os
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
@@ -294,10 +295,17 @@ class ClubhouseBot:
 
 def main():
     """Main function for bot usage"""
+    parser = argparse.ArgumentParser(description='Clubhouse Online Tee Time Bot')
+    parser.add_argument('--keep-open', '-k', action='store_true',
+                        help='Keep browser open after script finishes for manual navigation')
+    parser.add_argument('--headless', action='store_true',
+                        help='Run browser in headless mode (no GUI)')
+    args = parser.parse_args()
+
     bot = None
     try:
         # Create bot instance
-        bot = ClubhouseBot(headless=False)
+        bot = ClubhouseBot(headless=args.headless)
 
         # Perform login
         if bot.login():
@@ -326,7 +334,17 @@ def main():
         else:
             print(f"✗ Could not find date element for {next_sat}")
 
-        time.sleep(5)
+        if args.keep_open:
+            print("\n" + "="*50)
+            print("Browser kept open. Press Ctrl+C to close...")
+            print("="*50)
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print("\nClosing browser...")
+        else:
+            time.sleep(5)
 
     except ValueError as e:
         print(f"Configuration Error: {e}")
