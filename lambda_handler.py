@@ -41,13 +41,22 @@ def handler(event, context):
 
         # Attempt to find and click the next Saturday
         el = bot.find_date_element(next_sat.day, next_sat.month, next_sat.year, click=True, timeout=8)
-        if el:
-            logger.info("Found and clicked date element")
-            # Optionally proceed to booking steps here
-            return {"status": "ok", "action": "clicked_date", "date": str(next_sat)}
-        else:
+        if not el:
             logger.warning("Date element not found")
-            return {"status": "ok", "action": "date_not_found", "date": str(next_sat)}
+            return {"status": "error", "action": "date_not_found", "date": str(next_sat)}
+
+        logger.info(f"Found and clicked date element for {next_sat}")
+
+        # Try to select the 8:07 AM Hole 10 tee time
+        import time
+        time.sleep(3)  # Wait for tee times to load
+
+        if bot.select_tee_time("8:07", 10):
+            logger.info("Successfully selected 8:07 AM Hole 10 tee time")
+            return {"status": "ok", "action": "tee_time_selected", "date": str(next_sat), "time": "8:07", "hole": 10}
+        else:
+            logger.warning("8:07 AM Hole 10 tee time not available")
+            return {"status": "ok", "action": "tee_time_unavailable", "date": str(next_sat), "time": "8:07", "hole": 10}
 
     except Exception as e:
         logger.exception("Unexpected error in Lambda handler")
