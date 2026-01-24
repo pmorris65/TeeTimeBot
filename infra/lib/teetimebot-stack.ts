@@ -1,9 +1,8 @@
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
-import * as events from 'aws-cdk-lib/aws-events';
-import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as scheduler from 'aws-cdk-lib/aws-scheduler';
 import { Construct } from 'constructs';
 
 interface TeetimebotStackProps extends cdk.StackProps {
@@ -104,22 +103,19 @@ export class TeetimebotStack extends cdk.Stack {
       resources: [`arn:aws:lambda:${this.region}:${this.account}:function:teetimebot-*`],
     }));
 
-    // EventBridge permissions
+    // EventBridge Scheduler permissions
     githubActionsRole.addToPolicy(new iam.PolicyStatement({
-      sid: 'EventBridge',
+      sid: 'Scheduler',
       actions: [
-        'events:PutRule',
-        'events:DeleteRule',
-        'events:DescribeRule',
-        'events:EnableRule',
-        'events:DisableRule',
-        'events:PutTargets',
-        'events:RemoveTargets',
-        'events:ListTargetsByRule',
-        'events:TagResource',
-        'events:UntagResource',
+        'scheduler:CreateSchedule',
+        'scheduler:UpdateSchedule',
+        'scheduler:DeleteSchedule',
+        'scheduler:GetSchedule',
+        'scheduler:ListSchedules',
+        'scheduler:TagResource',
+        'scheduler:UntagResource',
       ],
-      resources: [`arn:aws:events:${this.region}:${this.account}:rule/teetimebot-*`],
+      resources: [`arn:aws:scheduler:${this.region}:${this.account}:schedule/default/teetimebot-*`],
     }));
 
     // IAM permissions for Lambda execution role
@@ -190,11 +186,22 @@ export class TeetimebotStack extends cdk.Stack {
       },
     });
 
-    // EventBridge schedule - every Saturday at 6 AM UTC
-    new events.Rule(this, 'WeeklySchedule', {
-      ruleName: 'teetimebot-weekly-schedule',
-      schedule: events.Schedule.cron({ minute: '0', hour: '6', weekDay: 'SAT' }),
-      targets: [new targets.LambdaFunction(fn)],
+    // IAM role for EventBridge Scheduler to invoke Lambda
+    const schedulerRole = new iam.Role(this, 'SchedulerRole', {
+      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
+    });
+    fn.grantInvoke(schedulerRole);
+
+    // EventBridge Scheduler - every Saturday at 6:01 AM Eastern Time (handles DST)
+    new scheduler.CfnSchedule(this, 'WeeklySchedule', {
+      name: 'teetimebot-weekly-schedule',
+      scheduleExpression: 'cron(1 6 ? * SAT *)',
+      scheduleExpressionTimezone: 'America/New_York',
+      flexibleTimeWindow: { mode: 'OFF' },
+      target: {
+        arn: fn.functionArn,
+        roleArn: schedulerRole.roleArn,
+      },
     });
 
     // Outputs
