@@ -42,7 +42,8 @@ COPY requirements.txt ${LAMBDA_TASK_ROOT}/
 RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
 
 # Install Playwright Chromium browser
-RUN mkdir -p /opt/playwright && playwright install chromium
+RUN mkdir -p /opt/playwright && \
+    DEBUG=pw:install playwright install chromium
 
 # Copy function code and bot module
 COPY clubhouse_bot.py ${LAMBDA_TASK_ROOT}/
