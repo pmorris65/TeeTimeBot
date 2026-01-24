@@ -1,7 +1,7 @@
-FROM public.ecr.aws/lambda/python:3.11
+FROM public.ecr.aws/lambda/python:3.12
 
 # Install system dependencies required by Playwright/Chromium
-RUN yum install -y \
+RUN dnf install -y \
     alsa-lib \
     atk \
     at-spi2-atk \
@@ -19,18 +19,11 @@ RUN yum install -y \
     libXtst \
     libxkbcommon \
     pango \
-    xorg-x11-fonts-100dpi \
-    xorg-x11-fonts-75dpi \
-    xorg-x11-fonts-cyrillic \
-    xorg-x11-fonts-misc \
-    xorg-x11-fonts-Type1 \
-    xorg-x11-utils \
     nss \
     nspr \
     libdrm \
     mesa-libgbm \
-    libgbm \
-    && yum clean all
+    && dnf clean all
 
 # Set Playwright browser path
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
@@ -42,8 +35,7 @@ COPY requirements.txt ${LAMBDA_TASK_ROOT}/
 RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
 
 # Install Playwright Chromium browser
-RUN mkdir -p /opt/playwright && \
-    DEBUG=pw:install playwright install chromium
+RUN mkdir -p /opt/playwright && playwright install chromium
 
 # Copy function code and bot module
 COPY clubhouse_bot.py ${LAMBDA_TASK_ROOT}/
