@@ -375,7 +375,7 @@ class ClubhouseBot:
             self._log_available_tee_times()
             return False
 
-    def add_guests_to_booking(self, guest_name="Guest, TBD", num_guests=3, holes_to_play=18, timeout=10):
+    def add_guests_to_booking(self, guest_name="Guest, TBD", num_guests=3, holes_to_play=18, transport="CART", timeout=10):
         """
         Add guests to the booking after selecting a tee time.
 
@@ -385,12 +385,13 @@ class ClubhouseBot:
             guest_name (str): Name to search for in the guest list
             num_guests (int): Number of guests to add (default 3, since player 1 is the member)
             holes_to_play (int): Number of holes to play (9 or 18)
+            transport (str): Mode of transport - CART, WALK, or WALK/RIDE
             timeout (int): Seconds to wait for elements
 
         Returns:
             int: Number of guests successfully added
         """
-        print(f"Adding {num_guests} guests to booking ({holes_to_play} holes)...")
+        print(f"Adding {num_guests} guests to booking ({holes_to_play} holes, {transport})...")
 
         try:
             # Wait for booking modal to load
@@ -449,6 +450,30 @@ class ClubhouseBot:
                 time.sleep(0.5)
             except Exception as e:
                 print(f"⚠ Could not set holes (may already be set): {e}")
+
+            # Select mode of transport using "Define All > MOT" button
+            try:
+                mot_button = self.page.get_by_role("button", name="MOT")
+                mot_button.wait_for(timeout=timeout * 1000)
+                mot_button.click()
+                print("✓ Opened MOT dialog")
+                time.sleep(0.5)
+
+                # Map transport value to button text
+                transport_map = {
+                    "CART": "CART (CRT)",
+                    "WALK": "WALK (WLK)",
+                    "WALK/RIDE": "WALK/RIDE (W/R)"
+                }
+                transport_button_text = transport_map.get(transport.upper(), "CART (CRT)")
+
+                # Click the transport option button
+                transport_option = self.page.get_by_role("button", name=transport_button_text)
+                transport_option.click()
+                print(f"✓ Selected {transport} transport")
+                time.sleep(0.5)
+            except Exception as e:
+                print(f"⚠ Could not set transport (may already be set): {e}")
 
             # Click Back button on the page to return to tee times list
             time.sleep(1)
@@ -606,9 +631,9 @@ def main():
 
             if bot.select_tee_time(pref.time, pref.hole):
                 # Add guests to the booking and set holes to play
-                guests_added = bot.add_guests_to_booking("Guest, TBD", num_guests=3, holes_to_play=pref.holes_to_play)
+                guests_added = bot.add_guests_to_booking("Guest, TBD", num_guests=3, holes_to_play=pref.holes_to_play, transport=pref.transport)
                 if guests_added > 0:
-                    print(f"  ✓ Added {guests_added} guests to the booking ({pref.holes_to_play} holes)")
+                    print(f"  ✓ Added {guests_added} guests to the booking ({pref.holes_to_play} holes, {pref.transport})")
 
                 booked_times.append(pref)
                 print(f"  ✓ Successfully selected: {pref.time} Hole {pref.hole}\n")

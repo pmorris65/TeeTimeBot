@@ -80,13 +80,14 @@ def handler(event, context):
 
             if bot.select_tee_time(pref.time, pref.hole):
                 # Add guests to the booking and set holes to play
-                guests_added = bot.add_guests_to_booking("Guest, TBD", num_guests=3, holes_to_play=pref.holes_to_play)
-                logger.info(f"Added {guests_added} guests to booking ({pref.holes_to_play} holes)")
+                guests_added = bot.add_guests_to_booking("Guest, TBD", num_guests=3, holes_to_play=pref.holes_to_play, transport=pref.transport)
+                logger.info(f"Added {guests_added} guests to booking ({pref.holes_to_play} holes, {pref.transport})")
 
                 booked_times.append({
                     "time": pref.time,
                     "hole": pref.hole,
                     "holes_to_play": pref.holes_to_play,
+                    "transport": pref.transport,
                     "priority": pref.priority,
                     "guests_added": guests_added
                 })

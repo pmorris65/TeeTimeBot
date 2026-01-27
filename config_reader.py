@@ -8,10 +8,10 @@ Sheet 1 - "Settings":
   | Tee Times to Book | 4     |
 
 Sheet 2 - "Preferences":
-  | Priority | Time  | Hole | Holes to Play |
-  | 1        | 8:07  | 10   | 18            |
-  | 2        | 8:15  | 10   | 18            |
-  | ...      | ...   | ...  | ...           |
+  | Priority | Time  | Hole | Holes to Play | Transport |
+  | 1        | 8:07  | 10   | 18            | CART      |
+  | 2        | 8:15  | 10   | 18            | WALK      |
+  | ...      | ...   | ...  | ...           | ...       |
 """
 
 import os
@@ -30,6 +30,7 @@ class TeeTimePreference:
     time: str
     hole: int
     holes_to_play: int  # 9 or 18
+    transport: str  # CART, WALK, or WALK/RIDE
 
 
 @dataclass
@@ -86,10 +87,10 @@ def get_config_from_sheets(spreadsheet_id: str, credentials_json: Optional[str] 
             tee_times_to_book = int(row[1])
             break
 
-    # Read preferences from "Preferences" sheet (A:D, skip header)
+    # Read preferences from "Preferences" sheet (A:E, skip header)
     prefs_result = sheet.values().get(
         spreadsheetId=spreadsheet_id,
-        range='Preferences!A2:D20'
+        range='Preferences!A2:E20'
     ).execute()
     prefs_values = prefs_result.get('values', [])
 
@@ -98,11 +99,18 @@ def get_config_from_sheets(spreadsheet_id: str, credentials_json: Optional[str] 
     for row in prefs_values:
         if len(row) >= 4:
             try:
+                # Transport defaults to CART if not specified
+                transport = str(row[4]).strip().upper() if len(row) >= 5 else "CART"
+                # Normalize transport values
+                if transport not in ["CART", "WALK", "WALK/RIDE"]:
+                    transport = "CART"
+
                 pref = TeeTimePreference(
                     priority=int(row[0]),
                     time=str(row[1]).strip(),
                     hole=int(row[2]),
-                    holes_to_play=int(row[3])
+                    holes_to_play=int(row[3]),
+                    transport=transport
                 )
                 preferences.append(pref)
             except (ValueError, IndexError) as e:
@@ -125,6 +133,6 @@ def get_default_config() -> TeeTimeConfig:
     return TeeTimeConfig(
         tee_times_to_book=1,
         preferences=[
-            TeeTimePreference(priority=1, time="8:07", hole=10, holes_to_play=18)
+            TeeTimePreference(priority=1, time="8:07", hole=10, holes_to_play=18, transport="CART")
         ]
     )
