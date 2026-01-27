@@ -183,6 +183,8 @@ export class TeetimebotStack extends cdk.Stack {
         CLUBHOUSE_USERNAME: process.env.CLUBHOUSE_USERNAME || '',
         CLUBHOUSE_PASSWORD: process.env.CLUBHOUSE_PASSWORD || '',
         CLUBHOUSE_URL: process.env.CLUBHOUSE_URL || 'https://cypresslakecc.clubhouseonline-e3.com/Member-Central',
+        GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID || '',
+        GOOGLE_CREDENTIALS: process.env.GOOGLE_CREDENTIALS || '',
       },
     });
 

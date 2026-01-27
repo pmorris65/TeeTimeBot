@@ -65,6 +65,8 @@ jobs:
           CLUBHOUSE_USERNAME: ${{ secrets.CLUBHOUSE_USERNAME }}
           CLUBHOUSE_PASSWORD: ${{ secrets.CLUBHOUSE_PASSWORD }}
           CLUBHOUSE_URL: ${{ secrets.CLUBHOUSE_URL }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
           cdk deploy --require-approval never \
             -c githubOrg=${{ github.repository_owner }} \
