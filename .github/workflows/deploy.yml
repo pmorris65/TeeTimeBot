@@ -12,7 +12,6 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: teetimebot
-  IMAGE_TAG: latest
 
 jobs:
   build-and-deploy:
@@ -37,14 +36,17 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build, tag, and push image to Amazon ECR
+        id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+          VERSION: v${{ github.run_number }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "Building version $VERSION"
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -71,6 +73,23 @@ jobs:
           cdk deploy --require-approval never \
             -c githubOrg=${{ github.repository_owner }} \
             -c githubRepo=${{ github.event.repository.name }}
+
+      - name: Update Lambda to use new image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          VERSION: ${{ steps.build-image.outputs.version }}
+        run: |
+          echo "Deploying $VERSION to Lambda"
+          aws lambda update-function-code \
+            --function-name teetimebot-scheduled \
+            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for Lambda update to complete
+        run: |
+          aws lambda wait function-updated \
+            --function-name teetimebot-scheduled \
+            --region ${{ env.AWS_REGION }}
 
       - name: Verify Lambda deployment
         run: |
