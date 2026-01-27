@@ -375,7 +375,7 @@ class ClubhouseBot:
             self._log_available_tee_times()
             return False
 
-    def add_guests_to_booking(self, guest_name="Guest, TBD", num_guests=3, timeout=10):
+    def add_guests_to_booking(self, guest_name="Guest, TBD", num_guests=3, holes_to_play=18, timeout=10):
         """
         Add guests to the booking after selecting a tee time.
 
@@ -384,12 +384,13 @@ class ClubhouseBot:
         Args:
             guest_name (str): Name to search for in the guest list
             num_guests (int): Number of guests to add (default 3, since player 1 is the member)
+            holes_to_play (int): Number of holes to play (9 or 18)
             timeout (int): Seconds to wait for elements
 
         Returns:
             int: Number of guests successfully added
         """
-        print(f"Adding {num_guests} guests to booking...")
+        print(f"Adding {num_guests} guests to booking ({holes_to_play} holes)...")
 
         try:
             # Wait for booking modal to load
@@ -432,6 +433,22 @@ class ClubhouseBot:
                     break
 
             print(f"✓ Added {guests_added} guests to the booking")
+
+            # Select number of holes using "Define All > Holes" dropdown
+            try:
+                holes_button = self.page.get_by_role("button", name="Holes")
+                holes_button.wait_for(timeout=timeout * 1000)
+                holes_button.click()
+                print("✓ Opened Holes dropdown")
+                time.sleep(0.5)
+
+                # Select 9 or 18 holes from the dropdown
+                holes_option = self.page.get_by_role("link", name=str(holes_to_play))
+                holes_option.click()
+                print(f"✓ Selected {holes_to_play} holes")
+                time.sleep(0.5)
+            except Exception as e:
+                print(f"⚠ Could not set holes (may already be set): {e}")
 
             # Click Back button on the page to return to tee times list
             time.sleep(1)
@@ -588,10 +605,10 @@ def main():
             print(f"Trying preference {pref.priority}: {pref.time} Hole {pref.hole} ({pref.holes_to_play} holes)")
 
             if bot.select_tee_time(pref.time, pref.hole):
-                # Add guests to the booking
-                guests_added = bot.add_guests_to_booking("Guest, TBD", num_guests=3)
+                # Add guests to the booking and set holes to play
+                guests_added = bot.add_guests_to_booking("Guest, TBD", num_guests=3, holes_to_play=pref.holes_to_play)
                 if guests_added > 0:
-                    print(f"  ✓ Added {guests_added} guests to the booking")
+                    print(f"  ✓ Added {guests_added} guests to the booking ({pref.holes_to_play} holes)")
 
                 booked_times.append(pref)
                 print(f"  ✓ Successfully selected: {pref.time} Hole {pref.hole}\n")
