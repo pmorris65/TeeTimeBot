@@ -73,15 +73,36 @@ class ClubhouseBot:
 
         # Initialize Playwright
         self.playwright = sync_playwright().start()
-        self.browser = self.playwright.chromium.launch(
-            headless=headless,
-            args=[
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled"
-            ]
-        )
-        self.page = self.browser.new_page()
+
+        # Browser launch args - extra flags needed for Lambda/container environments
+        browser_args = [
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-blink-features=AutomationControlled",
+            "--disable-gpu",
+            "--single-process",
+            "--disable-setuid-sandbox",
+            "--no-zygote",
+        ]
+
+        try:
+            self.browser = self.playwright.chromium.launch(
+                headless=headless,
+                args=browser_args
+            )
+            self.page = self.browser.new_page()
+        except Exception as e:
+            print(f"Failed to launch browser: {e}")
+            print(f"Browser args: {browser_args}")
+            print(f"Headless: {headless}")
+            # Try to get more info about playwright installation
+            import subprocess
+            try:
+                result = subprocess.run(["playwright", "install", "--help"], capture_output=True, text=True)
+                print(f"Playwright available: yes")
+            except:
+                print(f"Playwright CLI not available")
+            raise
 
     def login(self):
         """
