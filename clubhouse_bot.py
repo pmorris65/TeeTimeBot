@@ -292,7 +292,7 @@ class ClubhouseBot:
         print(f"Looking for tee time: {time_slot} on Hole {hole}...")
 
         # Wait for tee times to load
-        time.sleep(2)
+        time.sleep(5)
 
         try:
             # Normalize time to HH:MM:SS format for data-timeof attribute
@@ -374,6 +374,94 @@ class ClubhouseBot:
             print(f"✗ Error selecting tee time: {str(e)}")
             self._log_available_tee_times()
             return False
+
+    def add_guests_to_booking(self, guest_name="Guest, TBD", num_guests=3, timeout=10):
+        """
+        Add guests to the booking after selecting a tee time.
+
+        This should be called after select_tee_time() opens the booking modal.
+
+        Args:
+            guest_name (str): Name to search for in the guest list
+            num_guests (int): Number of guests to add (default 3, since player 1 is the member)
+            timeout (int): Seconds to wait for elements
+
+        Returns:
+            int: Number of guests successfully added
+        """
+        print(f"Adding {num_guests} guests to booking...")
+
+        try:
+            # Wait for booking modal to load
+            time.sleep(4)
+
+            # Click on Guests tab
+            guests_tab = self.page.get_by_role("button", name="Guests")
+            guests_tab.wait_for(timeout=timeout * 1000)
+            guests_tab.click()
+            print("✓ Clicked Guests tab")
+            time.sleep(1)
+
+            # Find and fill the search box
+            search_box = self.page.get_by_role("searchbox", name="Search for Guest")
+            search_box.wait_for(timeout=timeout * 1000)
+            search_box.fill(guest_name)
+            print(f"✓ Entered search term: {guest_name}")
+
+            # Press Enter to search
+            search_box.press("Enter")
+            print("✓ Searching for guests...")
+            time.sleep(2)  # Wait for search results
+
+            # Click the "Add Player to your Group" buttons
+            # Each button corresponds to a different guest in the search results
+            guests_added = 0
+            add_buttons = self.page.get_by_role("button", name="Add Player to your Group")
+            button_count = add_buttons.count()
+            print(f"  Found {button_count} 'Add Player' buttons")
+
+            for i in range(min(num_guests, button_count)):
+                try:
+                    # Click the i-th button (0, 1, 2, ...)
+                    add_buttons.nth(i).click()
+                    guests_added += 1
+                    print(f"✓ Added guest {guests_added}/{num_guests}")
+                    time.sleep(0.5)  # Brief pause between clicks
+                except Exception as e:
+                    print(f"✗ Error adding guest {i+1}: {e}")
+                    break
+
+            print(f"✓ Added {guests_added} guests to the booking")
+
+            # Click Back button on the page to return to tee times list
+            time.sleep(1)
+            # The Back button is in the booking modal's navigation bar (nav element)
+            # This nav also contains "Submit Reservation" - use this to identify the correct nav
+            # Avoid matching the header's "Back To Member Central" link
+            try:
+                modal_nav = self.page.locator("nav:has-text('Submit')")
+                back_button = modal_nav.locator("text=Back").first
+                back_button.click()
+                print("✓ Clicked Back button on page")
+                time.sleep(3)  # Wait for tee times page to reload
+            except:
+                # Fallback: try the last nav element's Back button
+                self.page.locator("nav").last.locator("text=Back").first.click()
+                print("✓ Clicked Back button (fallback)")
+                time.sleep(3)
+
+            return guests_added
+
+        except Exception as e:
+            print(f"✗ Error adding guests: {str(e)}")
+            # Try to go back even on error
+            try:
+                modal_nav = self.page.locator("nav:has-text('Submit')")
+                modal_nav.locator("text=Back").first.click()
+                time.sleep(3)
+            except:
+                pass
+            return 0
 
     def _log_available_tee_times(self):
         """Debug helper to log visible tee time elements on the page."""
@@ -500,6 +588,11 @@ def main():
             print(f"Trying preference {pref.priority}: {pref.time} Hole {pref.hole} ({pref.holes_to_play} holes)")
 
             if bot.select_tee_time(pref.time, pref.hole):
+                # Add guests to the booking
+                guests_added = bot.add_guests_to_booking("Guest, TBD", num_guests=3)
+                if guests_added > 0:
+                    print(f"  ✓ Added {guests_added} guests to the booking")
+
                 booked_times.append(pref)
                 print(f"  ✓ Successfully selected: {pref.time} Hole {pref.hole}\n")
             else:
