@@ -296,13 +296,32 @@ class ClubhouseBot:
 
         try:
             # Normalize time to HH:MM:SS format for data-timeof attribute
+            # Handle AM/PM if explicitly provided
+            is_pm = ' PM' in time_slot.upper() or ' pm' in time_slot.lower()
+            is_am = ' AM' in time_slot.upper() or ' am' in time_slot.lower()
+
             time_normalized = time_slot.replace(' AM', '').replace(' PM', '').replace(' am', '').replace(' pm', '').strip()
-            # Convert "8:07" to "08:07:00"
+
+            # Convert "8:07" to "08:07:00" or "1:30" to "13:30:00"
             parts = time_normalized.split(':')
             if len(parts) == 2:
-                hour = parts[0].zfill(2)
+                hour = int(parts[0])
                 minute = parts[1].zfill(2)
-                time_data = f"{hour}:{minute}:00"
+
+                # If explicit AM/PM was provided, use that
+                if is_pm and hour < 12:
+                    hour += 12
+                elif is_am and hour == 12:
+                    hour = 0
+                # If no AM/PM provided, infer from hour value
+                # Golf tee times: hours 1-5 are typically PM (afternoon)
+                # Hours 6-11 are AM, hour 12 is noon
+                elif not is_pm and not is_am:
+                    if 1 <= hour <= 5:
+                        hour += 12  # 1:30 -> 13:30, 2:00 -> 14:00, etc.
+
+                time_data = f"{str(hour).zfill(2)}:{minute}:00"
+                print(f"  Time format: '{time_slot}' -> '{time_data}'")
             else:
                 time_data = time_normalized
 
@@ -336,11 +355,19 @@ class ClubhouseBot:
 
                 return False
 
-            # Tee time is available - click it
+            # Tee time is available - click the book button inside the card
             print(f"✓ Tee time {time_slot} Hole {hole} is AVAILABLE (slots: {slots_available})")
             element.scroll_into_view_if_needed()
-            element.click()
-            print(f"✓ Clicked on tee time: {time_slot} on Hole {hole}")
+
+            # Find and click the book button inside the card
+            book_button = element.locator('button.book-btn')
+            if book_button.count() > 0:
+                book_button.first.click()
+                print(f"✓ Clicked book button for: {time_slot} on Hole {hole}")
+            else:
+                # Fallback to clicking the card itself
+                element.click()
+                print(f"✓ Clicked on tee time card: {time_slot} on Hole {hole}")
             return True
 
         except Exception as e:
@@ -399,6 +426,9 @@ class ClubhouseBot:
 
 def main():
     """Main function for bot usage"""
+    import os
+    from config_reader import get_config_from_sheets, get_default_config
+
     parser = argparse.ArgumentParser(description='Clubhouse Online Tee Time Bot')
     parser.add_argument('--keep-open', '-k', action='store_true',
                         help='Keep browser open after script finishes for manual navigation')
@@ -407,7 +437,23 @@ def main():
     args = parser.parse_args()
 
     bot = None
+    booked_times = []
+    failed_times = []
+
     try:
+        # Load configuration from Google Sheets
+        sheet_id = os.environ.get('GOOGLE_SHEET_ID')
+        if sheet_id:
+            try:
+                config = get_config_from_sheets(sheet_id)
+                print(f"✓ Loaded config: book {config.tee_times_to_book} times, {len(config.preferences)} preferences")
+            except Exception as e:
+                print(f"⚠ Failed to load Google Sheets config: {e}. Using defaults.")
+                config = get_default_config()
+        else:
+            print("⚠ No GOOGLE_SHEET_ID set, using default config")
+            config = get_default_config()
+
         # Create bot instance
         bot = ClubhouseBot(headless=args.headless)
 
@@ -416,64 +462,98 @@ def main():
             print("\n" + "="*50)
             print("Bot is logged in and ready for further actions")
             print("="*50)
-
-            # Keep browser open for 5 seconds to see the result
-            time.sleep(5)
+            time.sleep(2)
         else:
             print("Failed to login")
+            raise Exception("Login failed")
 
-        if bot.navToTeeTimes():
-            print("="*50)
-            print("Successfully navigated to Tee Times page.")
-            print("\n" + "="*50)
-        else:
+        if not bot.navToTeeTimes():
             print("Failed to navigate to Tee Times page.")
+            raise Exception("Navigation to Tee Times failed")
+
+        print("="*50)
+        print("Successfully navigated to Tee Times page.")
+        print("="*50)
 
         next_sat = get_next_saturday()
 
-        if bot.find_date_element(next_sat.day, next_sat.month, next_sat.year, click=True) != None:
-            print("="*50)
-            print(f"✓ Found and clicked on date element for {next_sat}")
-            print("="*50)
-
-            # Wait for tee times to load after date selection
-            time.sleep(3)
-
-            # Try to select the 8:07 AM Hole 10 tee time
-            if bot.select_tee_time("8:07", 10):
-                print("="*50)
-                print("✓ Successfully selected tee time!")
-                print("="*50)
-            else:
-                print("="*50)
-                print("✗ Could not select the 8:07 Hole 10 tee time")
-                print("="*50)
-        else:
+        if bot.find_date_element(next_sat.day, next_sat.month, next_sat.year, click=True) is None:
             print(f"✗ Could not find date element for {next_sat}")
+            raise Exception(f"Could not find date element for {next_sat}")
+
+        print("="*50)
+        print(f"✓ Found and clicked on date element for {next_sat}")
+        print("="*50)
+
+        # Wait for tee times to load after date selection
+        time.sleep(3)
+
+        # Try to book tee times from preferences
+        times_to_book = config.tee_times_to_book
+        print(f"\nAttempting to book {times_to_book} tee times from {len(config.preferences)} preferences\n")
+
+        for pref in config.preferences:
+            if len(booked_times) >= times_to_book:
+                print(f"✓ Reached target of {times_to_book} bookings, stopping")
+                break
+
+            print(f"Trying preference {pref.priority}: {pref.time} Hole {pref.hole} ({pref.holes_to_play} holes)")
+
+            if bot.select_tee_time(pref.time, pref.hole):
+                booked_times.append(pref)
+                print(f"  ✓ Successfully selected: {pref.time} Hole {pref.hole}\n")
+            else:
+                failed_times.append(pref)
+                print(f"  ✗ Not available: {pref.time} Hole {pref.hole}\n")
+
+        # Summary
+        print("="*50)
+        print(f"SUMMARY: Booked {len(booked_times)}/{times_to_book} tee times")
+        if booked_times:
+            print("Booked:")
+            for t in booked_times:
+                print(f"  - {t.time} Hole {t.hole} ({t.holes_to_play} holes)")
+        if failed_times:
+            print("Unavailable:")
+            for t in failed_times:
+                print(f"  - {t.time} Hole {t.hole}")
+        print("="*50)
 
         if args.keep_open:
             print("\n" + "="*50)
-            print("Browser kept open. Press Ctrl+C to close...")
+            print("Browser open. Press Enter to close...")
             print("="*50)
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                print("\nClosing browser...")
+            input()
+            if bot:
+                bot.close()
         else:
             time.sleep(5)
+            if bot:
+                bot.close()
 
     except ValueError as e:
         print(f"Configuration Error: {e}")
         print("\nPlease set up your .env file with:")
         print("  CLUBHOUSE_USERNAME=your_username")
         print("  CLUBHOUSE_PASSWORD=your_password")
+        if bot:
+            if args.keep_open:
+                print("\n" + "="*50)
+                print("Browser open (error occurred). Press Enter to close...")
+                print("="*50)
+                input()
+            bot.close()
 
     except Exception as e:
         print(f"Unexpected error: {e}")
-
-    finally:
+        import traceback
+        traceback.print_exc()
         if bot:
+            if args.keep_open:
+                print("\n" + "="*50)
+                print("Browser open (error occurred). Press Enter to close...")
+                print("="*50)
+                input()
             bot.close()
 
 
