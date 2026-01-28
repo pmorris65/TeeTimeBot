@@ -507,13 +507,16 @@ class ClubhouseBot:
             except Exception as e:
                 print(f"⚠ Could not set transport (may already be set): {e}")
 
-            # Click Submit Reservation button to confirm the booking
+            # Click Submit Reservation to confirm the booking
+            # Note: This is a div element, not a button, containing "Submit" and "Reservation" text
             time.sleep(1)
             try:
-                submit_button = self.page.get_by_role("button", name="Submit Reservation")
-                submit_button.wait_for(timeout=timeout * 1000)
-                submit_button.click()
-                print("✓ Clicked Submit Reservation button")
+                # Find the Submit element in the navigation bar
+                modal_nav = self.page.locator("nav")
+                submit_element = modal_nav.locator("text=Submit").first
+                submit_element.wait_for(timeout=timeout * 1000)
+                submit_element.click()
+                print("✓ Clicked Submit Reservation")
                 time.sleep(3)  # Wait for confirmation
 
                 # After submission, navigate back to tee times to book more
