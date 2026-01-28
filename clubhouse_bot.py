@@ -518,22 +518,6 @@ class ClubhouseBot:
                 submit_element.click()
                 print("✓ Clicked Submit Reservation")
                 time.sleep(3)  # Wait for confirmation
-
-                # After submission, navigate back to tee times to book more
-                # Look for a way back to tee times list
-                try:
-                    # Try clicking "Book Another Tee Time" or similar if it exists
-                    book_another = self.page.get_by_role("link", name="Book Another")
-                    if book_another.count() > 0:
-                        book_another.click()
-                        print("✓ Clicked 'Book Another' to return to tee times")
-                        time.sleep(2)
-                    else:
-                        # Navigate back to tee times page
-                        self.navToTeeTimes()
-                except:
-                    # Navigate back to tee times page
-                    self.navToTeeTimes()
             except Exception as e:
                 print(f"✗ Error submitting reservation: {e}")
                 # Try to go back on error
