@@ -23,6 +23,56 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 
+def normalize_time(time_str: str) -> str:
+    """
+    Normalize time string to H:MM format (e.g., '8:07', '1:30').
+
+    Handles various formats from Google Sheets:
+    - '8:07:00 AM' -> '8:07'
+    - '1:37:00 PM' -> '1:37'
+    - '13:30:00' -> '1:30'
+    - '8:07' -> '8:07' (unchanged)
+    """
+    import re
+    from datetime import datetime
+
+    time_str = time_str.strip()
+
+    # Try parsing common time formats
+    formats = [
+        '%I:%M:%S %p',  # 8:07:00 AM
+        '%I:%M %p',     # 8:07 AM
+        '%H:%M:%S',     # 08:07:00 or 13:30:00
+        '%H:%M',        # 08:07 or 13:30
+    ]
+
+    for fmt in formats:
+        try:
+            dt = datetime.strptime(time_str, fmt)
+            # Convert to 12-hour format without leading zero, no AM/PM
+            hour = dt.hour
+            if hour == 0:
+                hour = 12
+            elif hour > 12:
+                hour = hour - 12
+            return f"{hour}:{dt.minute:02d}"
+        except ValueError:
+            continue
+
+    # If no format matched, try to extract just H:MM pattern
+    match = re.search(r'(\d{1,2}):(\d{2})', time_str)
+    if match:
+        hour = int(match.group(1))
+        minute = int(match.group(2))
+        # If hour > 12, convert to 12-hour
+        if hour > 12:
+            hour = hour - 12
+        return f"{hour}:{minute:02d}"
+
+    # Return as-is if nothing worked
+    return time_str
+
+
 @dataclass
 class TeeTimePreference:
     """A single tee time preference."""
@@ -107,7 +157,7 @@ def get_config_from_sheets(spreadsheet_id: str, credentials_json: Optional[str] 
 
                 pref = TeeTimePreference(
                     priority=int(row[0]),
-                    time=str(row[1]).strip(),
+                    time=normalize_time(str(row[1])),
                     hole=int(row[2]),
                     holes_to_play=int(row[3]),
                     transport=transport
