@@ -507,22 +507,39 @@ class ClubhouseBot:
             except Exception as e:
                 print(f"⚠ Could not set transport (may already be set): {e}")
 
-            # Click Back button on the page to return to tee times list
+            # Click Submit Reservation button to confirm the booking
             time.sleep(1)
-            # The Back button is in the booking modal's navigation bar (nav element)
-            # This nav also contains "Submit Reservation" - use this to identify the correct nav
-            # Avoid matching the header's "Back To Member Central" link
             try:
-                modal_nav = self.page.locator("nav:has-text('Submit')")
-                back_button = modal_nav.locator("text=Back").first
-                back_button.click()
-                print("✓ Clicked Back button on page")
-                time.sleep(3)  # Wait for tee times page to reload
-            except:
-                # Fallback: try the last nav element's Back button
-                self.page.locator("nav").last.locator("text=Back").first.click()
-                print("✓ Clicked Back button (fallback)")
-                time.sleep(3)
+                submit_button = self.page.get_by_role("button", name="Submit Reservation")
+                submit_button.wait_for(timeout=timeout * 1000)
+                submit_button.click()
+                print("✓ Clicked Submit Reservation button")
+                time.sleep(3)  # Wait for confirmation
+
+                # After submission, navigate back to tee times to book more
+                # Look for a way back to tee times list
+                try:
+                    # Try clicking "Book Another Tee Time" or similar if it exists
+                    book_another = self.page.get_by_role("link", name="Book Another")
+                    if book_another.count() > 0:
+                        book_another.click()
+                        print("✓ Clicked 'Book Another' to return to tee times")
+                        time.sleep(2)
+                    else:
+                        # Navigate back to tee times page
+                        self.navToTeeTimes()
+                except:
+                    # Navigate back to tee times page
+                    self.navToTeeTimes()
+            except Exception as e:
+                print(f"✗ Error submitting reservation: {e}")
+                # Try to go back on error
+                try:
+                    modal_nav = self.page.locator("nav:has-text('Submit')")
+                    modal_nav.locator("text=Back").first.click()
+                    time.sleep(3)
+                except:
+                    pass
 
             return guests_added
 
