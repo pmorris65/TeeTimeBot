@@ -183,16 +183,27 @@ class ClubhouseBot:
             tee_time_selector = "#p_lt_header_3_cmsmenu_menuElem-006"
             self.page.locator(tee_time_selector).wait_for(timeout=10000)
             self.page.locator(tee_time_selector).click()
-            print("✓ Navigated to Tee Times page")
+            print("✓ Clicked Tee Times nav button")
 
-            # Wait for tee times to load
-            time.sleep(3)
+            # Wait for tee times page to load - either URL change or container element
+            try:
+                self.page.wait_for_url("**/TeeTimes**", timeout=10000)
+                print("✓ URL changed to TeeTimes page")
+            except:
+                # URL might not change, wait for the container instead
+                print("  URL didn't change, waiting for page content...")
+                self.page.locator("#modulesContainer").wait_for(timeout=10000)
+                print("✓ Found modulesContainer element")
+
+            # Additional wait for content to fully render
+            time.sleep(2)
 
             if self.isOnTeeTimesPage():
                 print("✓ Confirmed on Tee Times page")
                 return True
             else:
                 print("✗ Not on Tee Times page after navigation")
+                print(f"  Current URL: {self.page.url}")
                 return False
         except Exception as e:
             print(f"Error navigating to Tee Times page: {str(e)}")
