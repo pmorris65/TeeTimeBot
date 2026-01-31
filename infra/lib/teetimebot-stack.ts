@@ -197,7 +197,7 @@ export class TeetimebotStack extends cdk.Stack {
     // EventBridge Scheduler - every Saturday at 6:01 AM Eastern Time (handles DST)
     new scheduler.CfnSchedule(this, 'WeeklySchedule', {
       name: 'teetimebot-weekly-schedule',
-      scheduleExpression: 'cron(1 6 ? * SAT *)',
+      scheduleExpression: 'cron(0 6 ? * SAT *)',
       scheduleExpressionTimezone: 'America/New_York',
       flexibleTimeWindow: { mode: 'OFF' },
       target: {
