@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as scheduler from 'aws-cdk-lib/aws-scheduler';
 import { Construct } from 'constructs';
 
@@ -150,7 +151,7 @@ export class TeetimebotStack extends cdk.Stack {
       resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/cdk-bootstrap/*`],
     }));
 
-    // S3 for CDK staging
+    // S3 for CDK staging and video bucket management
     githubActionsRole.addToPolicy(new iam.PolicyStatement({
       sid: 'S3CDKStaging',
       actions: [
@@ -159,12 +160,30 @@ export class TeetimebotStack extends cdk.Stack {
         's3:DeleteObject',
         's3:ListBucket',
         's3:GetBucketLocation',
+        's3:CreateBucket',
+        's3:DeleteBucket',
+        's3:PutLifecycleConfiguration',
+        's3:GetLifecycleConfiguration',
+        's3:PutBucketPolicy',
+        's3:GetBucketPolicy',
+        's3:DeleteBucketPolicy',
       ],
       resources: [
         `arn:aws:s3:::cdk-*-assets-${this.account}-${this.region}`,
         `arn:aws:s3:::cdk-*-assets-${this.account}-${this.region}/*`,
+        `arn:aws:s3:::teetimebot-videos-${this.account}`,
+        `arn:aws:s3:::teetimebot-videos-${this.account}/*`,
       ],
     }));
+
+    // S3 bucket for storing session recording videos
+    const videoBucket = new s3.Bucket(this, 'VideoBucket', {
+      bucketName: `teetimebot-videos-${this.account}`,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      lifecycleRules: [
+        { expiration: cdk.Duration.days(30) },
+      ],
+    });
 
     // Import existing ECR repository
     const repository = ecr.Repository.fromRepositoryName(
@@ -185,8 +204,12 @@ export class TeetimebotStack extends cdk.Stack {
         CLUBHOUSE_URL: process.env.CLUBHOUSE_URL || 'https://cypresslakecc.clubhouseonline-e3.com/Member-Central',
         GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID || '',
         GOOGLE_CREDENTIALS: process.env.GOOGLE_CREDENTIALS || '',
+        S3_VIDEO_BUCKET: videoBucket.bucketName,
       },
     });
+
+    // Grant Lambda write access to the video bucket
+    videoBucket.grantWrite(fn);
 
     // IAM role for EventBridge Scheduler to invoke Lambda
     const schedulerRole = new iam.Role(this, 'SchedulerRole', {
@@ -215,6 +238,11 @@ export class TeetimebotStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'GitHubActionsRoleArn', {
       value: githubActionsRole.roleArn,
       description: 'GitHub Actions IAM Role ARN',
+    });
+
+    new cdk.CfnOutput(this, 'VideoBucketName', {
+      value: videoBucket.bucketName,
+      description: 'S3 bucket for session recording videos',
     });
   }
 }

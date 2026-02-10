@@ -41,6 +41,7 @@ RUN mkdir -p /opt/playwright && playwright install chromium
 COPY clubhouse_bot.py ${LAMBDA_TASK_ROOT}/
 COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
 COPY config_reader.py ${LAMBDA_TASK_ROOT}/
+COPY parallel_booking.py ${LAMBDA_TASK_ROOT}/
 
 # Set the CMD to your handler
 CMD [ "lambda_handler.handler" ]
