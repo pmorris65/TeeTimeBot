@@ -97,7 +97,9 @@ class ClubhouseBot:
             )
 
             if record_video:
-                video_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+                # Use /tmp in Lambda (read-only filesystem), otherwise output/ next to script
+                base_dir = "/tmp" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else os.path.dirname(os.path.abspath(__file__))
+                video_dir = os.path.join(base_dir, "output")
                 os.makedirs(video_dir, exist_ok=True)
                 self.context = self.browser.new_context(
                     record_video_dir=video_dir,
