@@ -135,7 +135,7 @@ class ClubhouseBot:
         """
         try:
             self._log(f"Navigating to {self.base_url}...")
-            self.page.goto(self.base_url)
+            self.page.goto(self.base_url, wait_until="domcontentloaded")
 
             # Wait for page to load
             time.sleep(2)
@@ -204,18 +204,26 @@ class ClubhouseBot:
             self._log("Looking for tee time nav button...")
             tee_time_selector = "#p_lt_header_3_cmsmenu_menuElem-006"
             self.page.locator(tee_time_selector).wait_for(timeout=10000)
-            self.page.locator(tee_time_selector).click()
-            self._log("✓ Clicked Tee Times nav button")
 
-            # Wait for tee times page to load - either URL change or container element
+            # Use expect_navigation to handle the page load triggered by the click.
+            # In Lambda, the navigation can hang on "load" (waiting for all resources),
+            # so we use "domcontentloaded" which resolves once the HTML is parsed.
             try:
-                self.page.wait_for_url("**/TeeTimes**", timeout=10000)
-                self._log("✓ URL changed to TeeTimes page")
-            except:
-                # URL might not change, wait for the container instead
-                self._log("  URL didn't change, waiting for page content...")
-                self.page.locator("#modulesContainer").wait_for(timeout=10000)
-                self._log("✓ Found modulesContainer element")
+                with self.page.expect_navigation(
+                    wait_until="domcontentloaded", timeout=30000
+                ):
+                    self.page.locator(tee_time_selector).click()
+                self._log("✓ Clicked Tee Times nav button (navigation completed)")
+            except Exception:
+                # Navigation may not trigger (SPA-style), just click and continue
+                self._log("✓ Clicked Tee Times nav button (no full navigation)")
+
+            # Wait for the tee times container to appear
+            self._log("  Waiting for page content...")
+            self.page.locator("#modulesContainer").wait_for(
+                state="attached", timeout=15000
+            )
+            self._log("✓ Found modulesContainer element")
 
             # Additional wait for content to fully render
             time.sleep(2)
