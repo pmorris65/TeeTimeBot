@@ -196,7 +196,7 @@ export class TeetimebotStack extends cdk.Stack {
     const fn = new lambda.DockerImageFunction(this, 'TeetimebotFunction', {
       functionName: 'teetimebot-scheduled',
       code: lambda.DockerImageCode.fromEcr(repository, { tagOrDigest: 'latest' }),
-      memorySize: 1024,
+      memorySize: 2048,
       timeout: cdk.Duration.seconds(180),
       environment: {
         CLUBHOUSE_USERNAME: process.env.CLUBHOUSE_USERNAME || '',
