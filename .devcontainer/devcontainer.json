@@ -1,0 +1,59 @@
+{
+  "name": "Python Development",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  // Mount the entire workspace
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  // Features to install
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/aws-cli:1": {}
+  },
+  // VS Code extensions to install
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "ms-python.flake8",
+        "charliermarsh.ruff",
+        "tamasfe.even-better-toml",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.linting.flake8Enabled": true,
+        "python.formatting.provider": "black",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": true
+        },
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter"
+        }
+      }
+    }
+  },
+  // Port forwarding
+  "forwardPorts": [
+    8000,
+    8080,
+    5000
+  ],
+  // Run commands after container creation
+  "postCreateCommand": "bash -c 'pip install --upgrade pip && if [ -f requirements.txt ]; then pip install -r requirements.txt; fi && playwright install chromium && sudo apt-get update && sudo apt-get install -y libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libdrm2 libxkbcommon0 libasound2 libatspi2.0-0 && curl -fsSL https://claude.ai/install.sh | bash'",
+  // Keep container running and configure git
+  "postStartCommand": "git config --global --add safe.directory /workspace",
+  // Environment variables
+  "remoteEnv": {
+    "PYTHONUNBUFFERED": "1"
+  },
+  // Run as non-root user
+  "remoteUser": "vscode",
+  // Use init process to handle signals properly
+  "init": true
+}
