@@ -81,16 +81,15 @@ class BookingCoordinator:
             return self.booking_count >= self.target_bookings
 
 
-def _parse_open_time():
-    """Parse TEE_TIME_OPEN env var (HH:MM format), default '06:00'."""
-    raw = os.environ.get("TEE_TIME_OPEN", "06:00")
-    parts = raw.split(":")
+def _parse_open_time(tee_time_open: str):
+    """Parse tee time open string (HH:MM format)."""
+    parts = tee_time_open.split(":")
     return int(parts[0]), int(parts[1])
 
 
-def _wait_until_open(tag: str):
+def _wait_until_open(tag: str, tee_time_open: str):
     """Sleep until tee times open at the configured time in ET."""
-    open_hour, open_minute = _parse_open_time()
+    open_hour, open_minute = _parse_open_time(tee_time_open)
     now = datetime.now(ET)
     target = now.replace(hour=open_hour, minute=open_minute, second=0, microsecond=0)
     delta = (target - now).total_seconds()
@@ -110,6 +109,7 @@ def booking_worker(
     coordinator: BookingCoordinator,
     headless: bool = True,
     record_video: bool = False,
+    tee_time_open: str = "06:00",
 ):
     """
     Worker function that runs in its own thread.
@@ -148,8 +148,8 @@ def booking_worker(
 
         print(f"{tag} Ready on {next_sat}, positioned on tee times page")
 
-        # Wait until tee times open (configurable via TEE_TIME_OPEN env var)
-        _wait_until_open(tag)
+        # Wait until tee times open
+        _wait_until_open(tag, tee_time_open)
 
         # Re-click the date to refresh tee time availability after opening
         bot.find_date_element(
@@ -205,6 +205,7 @@ def run_parallel_booking(
     config: TeeTimeConfig,
     headless: bool = True,
     record_video: bool = False,
+    tee_time_open: str = "06:00",
 ) -> Dict:
     """
     Orchestrate parallel booking of tee times.
@@ -244,7 +245,7 @@ def run_parallel_booking(
     for i in range(num_workers):
         t = threading.Thread(
             target=booking_worker,
-            args=(i + 1, coordinator, headless, record_video),
+            args=(i + 1, coordinator, headless, record_video, tee_time_open),
             name=f"BookingWorker-{i + 1}",
         )
         threads.append(t)

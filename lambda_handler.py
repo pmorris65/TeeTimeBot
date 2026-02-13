@@ -39,7 +39,13 @@ def handler(event, context):
 
         # Run parallel booking
         record_video = bool(os.environ.get('S3_VIDEO_BUCKET'))
-        result = run_parallel_booking(config, headless=True, record_video=record_video)
+        tee_time_open = event.get('tee_time_open', '06:00')
+        result = run_parallel_booking(
+            config,
+            headless=True,
+            record_video=record_video,
+            tee_time_open=tee_time_open,
+        )
         result["date"] = str(get_next_saturday())
 
         if result["booked_count"] == result["requested"]:

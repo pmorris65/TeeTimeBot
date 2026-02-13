@@ -226,7 +226,6 @@ export class TeetimebotStack extends cdk.Stack {
         GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID || '',
         GOOGLE_CREDENTIALS: process.env.GOOGLE_CREDENTIALS || '',
         S3_VIDEO_BUCKET: videoBucket.bucketName,
-        TEE_TIME_OPEN: process.env.TEE_TIME_OPEN || '06:00',
       },
     });
 
