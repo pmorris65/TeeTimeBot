@@ -226,6 +226,7 @@ export class TeetimebotStack extends cdk.Stack {
         GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID || '',
         GOOGLE_CREDENTIALS: process.env.GOOGLE_CREDENTIALS || '',
         S3_VIDEO_BUCKET: videoBucket.bucketName,
+        TEE_TIME_OPEN: process.env.TEE_TIME_OPEN || '06:00',
       },
     });
 
@@ -241,7 +242,7 @@ export class TeetimebotStack extends cdk.Stack {
 
       new scheduler.CfnSchedule(this, 'WeeklySchedule', {
         name: 'teetimebot-weekly-schedule',
-        scheduleExpression: 'cron(0 6 ? * SAT *)',
+        scheduleExpression: 'cron(59 5 ? * SAT *)',
         scheduleExpressionTimezone: 'America/New_York',
         flexibleTimeWindow: { mode: 'OFF' },
         target: {
