@@ -241,7 +241,7 @@ export class TeetimebotStack extends cdk.Stack {
 
       new scheduler.CfnSchedule(this, 'WeeklySchedule', {
         name: 'teetimebot-weekly-schedule',
-        scheduleExpression: 'cron(0 6 ? * SAT *)',
+        scheduleExpression: 'cron(59 5 ? * SAT *)',
         scheduleExpressionTimezone: 'America/New_York',
         flexibleTimeWindow: { mode: 'OFF' },
         target: {

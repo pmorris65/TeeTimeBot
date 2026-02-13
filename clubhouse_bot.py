@@ -640,6 +640,8 @@ def main():
                         help='Run browser in headless mode (no GUI)')
     parser.add_argument('--record-video', action='store_true',
                         help='Record a video of the browser session (saved to output/)')
+    parser.add_argument('--tee-time-open', default='06:00',
+                        help='Time tee times open in HH:MM 24h format (default: 06:00)')
     args = parser.parse_args()
 
     if args.keep_open:
@@ -664,6 +666,7 @@ def main():
             config,
             headless=args.headless,
             record_video=args.record_video,
+            tee_time_open=args.tee_time_open,
         )
 
         # Summary

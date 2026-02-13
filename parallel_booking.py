@@ -13,10 +13,14 @@ import threading
 import time
 import traceback
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import List, Dict
+from zoneinfo import ZoneInfo
 
 from clubhouse_bot import ClubhouseBot, get_next_saturday
 from config_reader import TeeTimeConfig
+
+ET = ZoneInfo("America/New_York")
 
 
 def _upload_video_to_s3(local_path: str, worker_id: int):
@@ -77,11 +81,35 @@ class BookingCoordinator:
             return self.booking_count >= self.target_bookings
 
 
+def _parse_open_time(tee_time_open: str):
+    """Parse tee time open string (HH:MM format)."""
+    parts = tee_time_open.split(":")
+    return int(parts[0]), int(parts[1])
+
+
+def _wait_until_open(tag: str, tee_time_open: str):
+    """Sleep until tee times open at the configured time in ET."""
+    open_hour, open_minute = _parse_open_time(tee_time_open)
+    now = datetime.now(ET)
+    target = now.replace(hour=open_hour, minute=open_minute, second=0, microsecond=0)
+    delta = (target - now).total_seconds()
+    period = "AM" if open_hour < 12 else "PM"
+    display_hour = open_hour % 12 or 12
+    target_str = f"{display_hour}:{str(open_minute).zfill(2)} {period} ET"
+    if delta > 0:
+        print(f"{tag} Waiting {delta:.1f}s until {target_str}...")
+        time.sleep(delta)
+        print(f"{tag} Go time! {datetime.now(ET).strftime('%H:%M:%S.%f')}")
+    else:
+        print(f"{tag} Already past {target_str}, proceeding immediately")
+
+
 def booking_worker(
     worker_id: int,
     coordinator: BookingCoordinator,
     headless: bool = True,
     record_video: bool = False,
+    tee_time_open: str = "06:00",
 ):
     """
     Worker function that runs in its own thread.
@@ -118,8 +146,16 @@ def booking_worker(
             coordinator.record_failure(worker_id, None, "date_not_found")
             return
 
-        print(f"{tag} Ready on {next_sat}, looking for tee times...")
-        time.sleep(3)
+        print(f"{tag} Ready on {next_sat}, positioned on tee times page")
+
+        # Wait until tee times open
+        _wait_until_open(tag, tee_time_open)
+
+        # Re-click the date to refresh tee time availability after opening
+        bot.find_date_element(
+            next_sat.day, next_sat.month, next_sat.year, click=True
+        )
+        time.sleep(2)
 
         # Pull preferences from the shared queue and attempt booking
         while not coordinator.target_reached():
@@ -169,6 +205,7 @@ def run_parallel_booking(
     config: TeeTimeConfig,
     headless: bool = True,
     record_video: bool = False,
+    tee_time_open: str = "06:00",
 ) -> Dict:
     """
     Orchestrate parallel booking of tee times.
@@ -208,7 +245,7 @@ def run_parallel_booking(
     for i in range(num_workers):
         t = threading.Thread(
             target=booking_worker,
-            args=(i + 1, coordinator, headless, record_video),
+            args=(i + 1, coordinator, headless, record_video, tee_time_open),
             name=f"BookingWorker-{i + 1}",
         )
         threads.append(t)
