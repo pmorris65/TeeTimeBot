@@ -42,7 +42,7 @@ jobs:
           VERSION: v${{ github.run_number }}
         run: |
           echo "Building version $VERSION"
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION .
+          docker build --provenance=false -t $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION .
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
