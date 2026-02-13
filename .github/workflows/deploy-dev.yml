@@ -1,12 +1,8 @@
-name: Build and Deploy with CDK
-
-# BOOTSTRAP NOTE: The first deployment requires the existing 'github-actions-ecr-role'
-# to have CDK deployment permissions. After the first successful deploy, you can switch
-# to the CDK-managed role 'github-actions-teetimebot-role' which has all required permissions.
+name: Deploy Dev Environment
 
 on:
   push:
-    branches:
+    branches-ignore:
       - main
 
 env:
@@ -14,7 +10,7 @@ env:
   ECR_REPOSITORY: teetimebot
 
 jobs:
-  build-and-deploy:
+  build-and-deploy-dev:
     runs-on: ubuntu-latest
 
     permissions:
@@ -39,13 +35,13 @@ jobs:
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          VERSION: v${{ github.run_number }}
+          VERSION: dev-v${{ github.run_number }}
         run: |
-          echo "Building version $VERSION"
+          echo "Building dev version $VERSION"
           docker build --provenance=false -t $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:dev-latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:dev-latest
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Set up Node.js
@@ -60,7 +56,7 @@ jobs:
         working-directory: infra
         run: npm ci
 
-      - name: Deploy with CDK
+      - name: Deploy Dev Stack with CDK
         working-directory: infra
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
@@ -70,30 +66,30 @@ jobs:
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
-          cdk deploy TeetimebotStack --require-approval never \
+          cdk deploy TeetimebotStack-Dev --require-approval never \
             -c githubOrg=${{ github.repository_owner }} \
             -c githubRepo=${{ github.event.repository.name }}
 
-      - name: Update Lambda to use new image
+      - name: Update Dev Lambda to use new image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           VERSION: ${{ steps.build-image.outputs.version }}
         run: |
-          echo "Deploying $VERSION to Lambda"
+          echo "Deploying $VERSION to Dev Lambda"
           aws lambda update-function-code \
-            --function-name teetimebot-scheduled \
+            --function-name teetimebot-dev \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION \
             --region ${{ env.AWS_REGION }}
 
       - name: Wait for Lambda update to complete
         run: |
           aws lambda wait function-updated \
-            --function-name teetimebot-scheduled \
+            --function-name teetimebot-dev \
             --region ${{ env.AWS_REGION }}
 
-      - name: Verify Lambda deployment
+      - name: Verify Dev Lambda deployment
         run: |
           aws lambda get-function \
-            --function-name teetimebot-scheduled \
+            --function-name teetimebot-dev \
             --region ${{ env.AWS_REGION }} \
             --query 'Configuration.{FunctionName:FunctionName,LastModified:LastModified,State:State}'

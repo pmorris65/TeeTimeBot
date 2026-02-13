@@ -13,11 +13,23 @@ if (!githubOrg || !githubRepo) {
   throw new Error('Missing required context: githubOrg and githubRepo. Set via -c or environment variables.');
 }
 
+const envConfig = {
+  account: process.env.CDK_DEFAULT_ACCOUNT || process.env.AWS_ACCOUNT_ID,
+  region: process.env.CDK_DEFAULT_REGION || process.env.AWS_REGION || 'us-east-1',
+};
+
+// Production stack
 new TeetimebotStack(app, 'TeetimebotStack', {
-  env: {
-    account: process.env.CDK_DEFAULT_ACCOUNT || process.env.AWS_ACCOUNT_ID,
-    region: process.env.CDK_DEFAULT_REGION || process.env.AWS_REGION || 'us-east-1',
-  },
+  env: envConfig,
   githubOrg,
   githubRepo,
+  stage: 'prod',
+});
+
+// Dev stack (no schedule, manual invoke only)
+new TeetimebotStack(app, 'TeetimebotStack-Dev', {
+  env: envConfig,
+  githubOrg,
+  githubRepo,
+  stage: 'dev',
 });
